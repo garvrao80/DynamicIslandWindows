@@ -159,9 +159,15 @@ function renderLyrics(state) {
     row.classList.toggle("near", lines.length && Math.abs(rowIndex - state.activeLyricIndex) === 1);
   });
 
-  const lineHeight = 36;
-  const centerOffset = 99;
-  lyricsList.style.transform = lines.length ? `translateY(${centerOffset - index * lineHeight}px)` : "translateY(70px)";
+  const centerOffset = 117; // Half of lyrics-window height (234/2)
+  const activeNode = lyricsList.children[Math.max(0, state.activeLyricIndex)];
+  
+  if (lines.length && activeNode) {
+    const nodeCenter = activeNode.offsetTop + (activeNode.offsetHeight / 2);
+    lyricsList.style.transform = `translateY(${centerOffset - nodeCenter}px)`;
+  } else {
+    lyricsList.style.transform = "translateY(90px)";
+  }
 }
 
 function render(state) {

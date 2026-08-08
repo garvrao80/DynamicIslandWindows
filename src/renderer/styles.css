@@ -320,7 +320,7 @@ button:hover {
 }
 
 .lyrics-window {
-  width: min(100%, 368px);
+  width: 100%;
   height: 234px;
   overflow: hidden;
   mask-image: linear-gradient(transparent, black 18%, black 82%, transparent);
@@ -330,42 +330,38 @@ button:hover {
   display: flex;
   flex-direction: column;
   gap: 0;
+  padding: 100px 0; /* extra padding to allow scrolling past edges */
   will-change: transform;
   transition: transform 460ms cubic-bezier(0.2, 0.85, 0.2, 1);
 }
 
 .lyric-line {
-  height: 36px;
-  min-height: 36px;
-  overflow: hidden;
+  padding: 6px 16px;
   color: rgba(247, 248, 251, 0.34);
   font-size: 17px;
   font-weight: 650;
-  line-height: 36px;
-  text-overflow: ellipsis;
+  line-height: 1.4;
   text-align: center;
-  white-space: nowrap;
   opacity: 0.56;
-  transform: translateX(0) scale(0.98);
-  transform-origin: left center;
+  transform: scale(0.94);
+  transform-origin: center center;
   transition:
     color 260ms ease,
     opacity 260ms ease,
-    transform 360ms cubic-bezier(0.2, 0.85, 0.2, 1),
-    font-size 260ms ease;
+    transform 360ms cubic-bezier(0.2, 0.85, 0.2, 1);
 }
 
 .lyric-line.near {
   opacity: 0.78;
   color: rgba(247, 248, 251, 0.58);
+  transform: scale(0.98);
 }
 
 .lyric-line.active {
   color: #ffffff;
-  font-size: 21px;
   font-weight: 800;
   opacity: 1;
-  transform: scale(1);
+  transform: scale(1.08);
 }
 
 .settings-popover {
