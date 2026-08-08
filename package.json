@@ -1,0 +1,51 @@
+{
+  "name": "lyrics-island-windows",
+  "version": "0.1.0",
+  "description": "A floating Dynamic-Island-style Spotify lyrics notch for Windows.",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "pack": "electron-packager . \"Lyrics Island\" --platform=win32 --arch=x64 --out=release --overwrite --ignore=release --ignore=.git",
+    "dist": "electron-builder --win nsis portable"
+  },
+  "keywords": [
+    "spotify",
+    "lyrics",
+    "windows",
+    "electron",
+    "dynamic-island"
+  ],
+  "author": "Garv Rao",
+  "license": "MIT",
+  "devDependencies": {
+    "@electron/packager": "^20.2.0",
+    "electron": "^32.3.3",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "dev.garvrao.lyricsisland",
+    "productName": "Lyrics Island",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "LyricsIsland-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

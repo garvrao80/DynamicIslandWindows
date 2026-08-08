@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lyrics Island</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="island" class="island" aria-label="Lyrics Island">
+      <section class="compact">
+        <div id="art" class="art"></div>
+        <div class="meta">
+          <div id="track" class="track">Lyrics Island</div>
+          <div id="lyric" class="lyric">Starting...</div>
+        </div>
+        <div class="controls">
+          <button id="previous" title="Previous" aria-label="Previous">‹</button>
+          <button id="play" title="Play or pause" aria-label="Play or pause">Ⅱ</button>
+          <button id="next" title="Next" aria-label="Next">›</button>
+        </div>
+      </section>
+
+      <section class="expanded">
+        <div class="expanded-header">
+          <div>
+            <div id="expandedTrack" class="expanded-track">Lyrics Island</div>
+            <div id="expandedArtist" class="expanded-artist">Windows floating lyrics</div>
+          </div>
+          <button id="collapse" title="Collapse" aria-label="Collapse">×</button>
+        </div>
+
+        <div id="lyricsList" class="lyrics-list"></div>
+
+        <form id="settings" class="settings">
+          <input id="clientId" name="clientId" placeholder="Spotify Client ID" autocomplete="off" />
+          <label class="toggle">
+            <input id="demoMode" type="checkbox" />
+            <span>Demo</span>
+          </label>
+          <label class="offset">
+            <span>Offset</span>
+            <input id="offset" type="number" step="100" />
+          </label>
+          <button id="connect" type="button">Connect</button>
+          <button type="submit">Save</button>
+        </form>
+
+        <div id="status" class="status">Ready</div>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
