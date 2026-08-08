@@ -10,6 +10,7 @@ const statusNode = document.getElementById("status");
 const clientId = document.getElementById("clientId");
 const demoMode = document.getElementById("demoMode");
 const offset = document.getElementById("offset");
+const opacityInput = document.getElementById("opacity");
 const settings = document.getElementById("settings");
 const settingsToggle = document.getElementById("settingsToggle");
 const connect = document.getElementById("connect");
@@ -189,6 +190,11 @@ function render(state) {
   if (document.activeElement !== clientId) clientId.value = state.config?.spotifyClientId || "";
   if (document.activeElement !== demoMode) demoMode.checked = Boolean(state.config?.demoMode);
   if (document.activeElement !== offset) offset.value = String(state.config?.lyricOffsetMs || 0);
+  if (document.activeElement !== opacityInput) {
+    const opacityVal = state.config?.opacity !== undefined ? state.config.opacity : 100;
+    opacityInput.value = String(opacityVal);
+    island.style.opacity = opacityVal / 100;
+  }
   renderProgress(playback);
   renderLyrics(state);
 }
@@ -236,12 +242,17 @@ progressTrack.addEventListener("pointerdown", (event) => {
 settingsToggle.addEventListener("click", () => island.classList.toggle("settings-open"));
 dashboard.addEventListener("click", () => window.lyricsIsland.openSpotifyDashboard());
 
+opacityInput.addEventListener("input", (event) => {
+  island.style.opacity = Number(event.target.value) / 100;
+});
+
 settings.addEventListener("submit", async (event) => {
   event.preventDefault();
   await window.lyricsIsland.saveConfig({
     spotifyClientId: clientId.value.trim(),
     demoMode: demoMode.checked,
-    lyricOffsetMs: Number(offset.value || 0)
+    lyricOffsetMs: Number(offset.value || 0),
+    opacity: Number(opacityInput.value || 100)
   });
   island.classList.remove("settings-open");
 });
@@ -257,7 +268,8 @@ connect.addEventListener("click", async () => {
   await window.lyricsIsland.saveConfig({
     spotifyClientId: clientId.value.trim(),
     demoMode: false,
-    lyricOffsetMs: Number(offset.value || 0)
+    lyricOffsetMs: Number(offset.value || 0),
+    opacity: Number(opacityInput.value || 100)
   });
 
   try {
