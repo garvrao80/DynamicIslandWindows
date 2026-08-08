@@ -188,7 +188,9 @@ function publishState(patch = {}) {
     config: publicConfig()
   };
 
-  mainWindow?.webContents.send("state:update", state);
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+    mainWindow.webContents.send("state:update", state);
+  }
 }
 
 async function refreshPlayback() {
