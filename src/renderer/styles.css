@@ -29,13 +29,13 @@ input {
   overflow: hidden;
   color: #f7f8fb;
   background:
-    radial-gradient(circle at 17% 20%, rgba(78, 227, 177, 0.26), transparent 28%),
-    radial-gradient(circle at 90% 38%, rgba(255, 203, 107, 0.18), transparent 32%),
-    rgba(11, 12, 14, 0.93);
+    radial-gradient(circle at 18% 18%, rgba(55, 214, 166, 0.26), transparent 28%),
+    radial-gradient(circle at 82% 26%, rgba(246, 195, 95, 0.2), transparent 34%),
+    rgba(12, 13, 15, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.46),
+    0 24px 80px rgba(0, 0, 0, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   -webkit-app-region: drag;
   transition:
@@ -50,24 +50,28 @@ input {
 
 .compact {
   display: grid;
-  grid-template-columns: 52px 1fr 92px;
+  grid-template-columns: 60px minmax(0, 1fr) 132px;
   align-items: center;
   gap: 12px;
   width: 100%;
-  height: 74px;
-  padding: 10px 14px;
+  height: 84px;
+  padding: 11px 16px;
 }
 
-.art {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
+.art,
+.expanded-art {
   background:
     linear-gradient(135deg, #4ee3b1, #f6c35f 48%, #e85d75),
     #202226;
   background-size: cover;
   background-position: center;
-  box-shadow: 0 0 28px rgba(78, 227, 177, 0.24);
+}
+
+.art {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  box-shadow: 0 0 30px rgba(78, 227, 177, 0.24);
 }
 
 .meta {
@@ -79,12 +83,13 @@ input {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 700;
+  font-weight: 750;
+  letter-spacing: 0;
 }
 
 .track {
-  max-width: 140px;
-  font-size: 13px;
+  max-width: 150px;
+  font-size: 14px;
 }
 
 .lyric,
@@ -97,22 +102,21 @@ input {
 }
 
 .lyric {
-  max-width: 140px;
-  margin-top: 3px;
+  max-width: 150px;
+  margin-top: 4px;
   font-size: 12px;
 }
 
-.controls {
+.controls,
+.expanded-controls {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
 }
 
 button {
-  width: 28px;
-  height: 28px;
   border: 0;
-  border-radius: 50%;
   color: #f7f8fb;
   background: rgba(255, 255, 255, 0.1);
   -webkit-app-region: no-drag;
@@ -122,10 +126,41 @@ button:hover {
   background: rgba(255, 255, 255, 0.18);
 }
 
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.icon-button.primary {
+  width: 42px;
+  height: 42px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-button.primary svg {
+  width: 20px;
+  height: 20px;
+}
+
 .expanded {
+  position: relative;
   display: none;
   height: 100%;
-  padding: 22px 24px 18px;
+  padding: 22px;
 }
 
 .expanded-mode .compact {
@@ -133,71 +168,127 @@ button:hover {
 }
 
 .expanded-mode .expanded {
-  display: grid;
-  grid-template-rows: 48px 1fr 38px 16px;
-  gap: 14px;
+  display: block;
 }
 
-.expanded-header {
+.close-button {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 3;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.expanded-grid {
   display: grid;
-  grid-template-columns: 1fr 32px;
-  align-items: start;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 26px;
+  height: 100%;
+}
+
+.now-playing {
+  display: grid;
+  grid-template-rows: 128px auto 48px auto 16px;
   gap: 12px;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+.expanded-art {
+  width: 128px;
+  height: 128px;
+  border-radius: 22px;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.35),
+    0 0 46px rgba(78, 227, 177, 0.18);
+}
+
+.expanded-meta {
+  min-width: 0;
 }
 
 .expanded-track {
-  max-width: 510px;
-  font-size: 18px;
+  max-width: 260px;
+  font-size: 24px;
+  line-height: 1.14;
 }
 
 .expanded-artist {
-  max-width: 510px;
-  margin-top: 3px;
-  font-size: 13px;
+  max-width: 260px;
+  margin-top: 6px;
+  font-size: 14px;
 }
 
-#collapse {
-  width: 32px;
-  height: 32px;
+.expanded-controls {
+  justify-content: flex-start;
 }
 
-.lyrics-list {
+.lyric-panel {
   display: grid;
-  grid-auto-rows: 28px;
-  align-content: center;
-  min-height: 140px;
+  align-items: center;
+  min-width: 0;
+  padding: 42px 22px 22px 0;
+}
+
+.lyrics-window {
+  height: 236px;
   overflow: hidden;
-  padding: 4px 0;
   mask-image: linear-gradient(transparent, black 18%, black 82%, transparent);
 }
 
+.lyrics-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  will-change: transform;
+  transition: transform 460ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+
 .lyric-line {
+  height: 36px;
+  min-height: 36px;
   overflow: hidden;
-  height: 28px;
-  line-height: 28px;
-  color: rgba(247, 248, 251, 0.38);
+  color: rgba(247, 248, 251, 0.34);
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 36px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color 150ms ease, transform 150ms ease, font-size 150ms ease, opacity 150ms ease;
+  opacity: 0.56;
+  transform: translateX(0) scale(0.98);
+  transform-origin: left center;
+  transition:
+    color 260ms ease,
+    opacity 260ms ease,
+    transform 360ms cubic-bezier(0.2, 0.85, 0.2, 1),
+    font-size 260ms ease;
+}
+
+.lyric-line.near {
+  opacity: 0.78;
+  color: rgba(247, 248, 251, 0.58);
 }
 
 .lyric-line.active {
   color: #ffffff;
-  font-size: 17px;
-  font-weight: 750;
-  transform: translateX(4px);
+  font-size: 21px;
+  font-weight: 800;
+  opacity: 1;
+  transform: translateX(8px) scale(1);
 }
 
 .settings {
   display: grid;
-  grid-template-columns: 1fr auto 96px 98px 84px 62px;
-  gap: 8px;
-  align-items: center;
+  gap: 9px;
+  align-content: start;
   -webkit-app-region: no-drag;
 }
 
 input {
   min-width: 0;
+  width: 100%;
   height: 34px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
@@ -207,12 +298,19 @@ input {
   outline: 0;
 }
 
+.settings-row,
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .toggle,
 .offset {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: rgba(247, 248, 251, 0.7);
+  color: rgba(247, 248, 251, 0.72);
   font-size: 12px;
 }
 
@@ -222,7 +320,7 @@ input {
 }
 
 .offset input {
-  width: 62px;
+  width: 68px;
   padding: 0 8px;
 }
 
@@ -234,5 +332,6 @@ input {
 }
 
 .status {
+  min-width: 0;
   font-size: 11px;
 }

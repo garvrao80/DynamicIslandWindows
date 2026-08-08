@@ -74,7 +74,7 @@ function createIcon() {
 function targetBounds(expanded = false) {
   const display = screen.getPrimaryDisplay();
   const { x, y, width } = display.workArea;
-  const size = expanded ? { width: 620, height: 336 } : { width: 312, height: 74 };
+  const size = expanded ? { width: 760, height: 360 } : { width: 390, height: 84 };
   const top = y + 18;
   const left = x + Math.round((width - size.width) / 2);
 

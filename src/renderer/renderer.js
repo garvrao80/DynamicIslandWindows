@@ -1,5 +1,6 @@
 const island = document.getElementById("island");
 const art = document.getElementById("art");
+const expandedArt = document.getElementById("expandedArt");
 const track = document.getElementById("track");
 const lyric = document.getElementById("lyric");
 const expandedTrack = document.getElementById("expandedTrack");
@@ -13,10 +14,38 @@ const settings = document.getElementById("settings");
 const connect = document.getElementById("connect");
 const dashboard = document.getElementById("dashboard");
 const play = document.getElementById("play");
+const expandedPlay = document.getElementById("expandedPlay");
 
 let expanded = false;
 let currentState = null;
 let expandTimer = null;
+let lastLyricsKey = "";
+
+const icons = {
+  previous:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5v14M15 6l-8 6 8 6V6z"></path></svg>',
+  next:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5v14M9 6l8 6-8 6V6z"></path></svg>',
+  play:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"></path></svg>',
+  pause:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"></path></svg>',
+  close:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>'
+};
+
+function setIcon(button, name) {
+  if (button) button.innerHTML = icons[name] || "";
+}
+
+function playbackAction() {
+  return currentState?.playback?.isPlaying ? "pause" : "play";
+}
+
+function applyArtwork(node, artworkUrl) {
+  if (!node) return;
+  node.style.backgroundImage = artworkUrl ? `url("${artworkUrl}")` : "";
+}
 
 function currentLyric(state) {
   const lines = state.lyrics?.synced || [];
@@ -30,26 +59,35 @@ function currentLyric(state) {
 function renderLyrics(state) {
   const lines = state.lyrics?.synced || [];
   const index = Math.max(0, state.activeLyricIndex);
-  const start = Math.max(0, index - 2);
-  const visible = lines.slice(start, start + 5);
+  const lyricsKey = lines.map((line) => `${line.timeMs}:${line.text}`).join("|") || state.lyrics?.plain || "empty";
 
-  lyricsList.innerHTML = "";
+  if (lyricsKey !== lastLyricsKey) {
+    lastLyricsKey = lyricsKey;
+    lyricsList.innerHTML = "";
 
-  if (!visible.length) {
-    const row = document.createElement("div");
-    row.className = "lyric-line active";
-    row.textContent = state.lyrics?.plain || "No synced lyrics yet";
-    lyricsList.appendChild(row);
-    return;
+    if (!lines.length) {
+      const row = document.createElement("div");
+      row.className = "lyric-line active";
+      row.textContent = state.lyrics?.plain || "No synced lyrics yet";
+      lyricsList.appendChild(row);
+    } else {
+      lines.forEach((line) => {
+        const row = document.createElement("div");
+        row.className = "lyric-line";
+        row.textContent = line.text;
+        lyricsList.appendChild(row);
+      });
+    }
   }
 
-  visible.forEach((line, visibleIndex) => {
-    const absoluteIndex = start + visibleIndex;
-    const row = document.createElement("div");
-    row.className = absoluteIndex === state.activeLyricIndex ? "lyric-line active" : "lyric-line";
-    row.textContent = line.text;
-    lyricsList.appendChild(row);
+  Array.from(lyricsList.children).forEach((row, rowIndex) => {
+    row.classList.toggle("active", lines.length ? rowIndex === state.activeLyricIndex : true);
+    row.classList.toggle("near", lines.length && Math.abs(rowIndex - state.activeLyricIndex) === 1);
   });
+
+  const lineHeight = 36;
+  const centerOffset = 94;
+  lyricsList.style.transform = lines.length ? `translateY(${centerOffset - index * lineHeight}px)` : "translateY(70px)";
 }
 
 function render(state) {
@@ -63,17 +101,15 @@ function render(state) {
   expandedTrack.textContent = title;
   expandedArtist.textContent = artist;
   statusNode.textContent = `${state.status || "Ready"} - ${state.lyrics?.source || "none"}`;
-  play.textContent = playback.isPlaying ? "||" : ">";
+  setIcon(play, playback.isPlaying ? "pause" : "play");
+  setIcon(expandedPlay, playback.isPlaying ? "pause" : "play");
 
-  if (playback.artworkUrl) {
-    art.style.backgroundImage = `url("${playback.artworkUrl}")`;
-  } else {
-    art.style.backgroundImage = "";
-  }
+  applyArtwork(art, playback.artworkUrl);
+  applyArtwork(expandedArt, playback.artworkUrl);
 
-  clientId.value = state.config?.spotifyClientId || "";
-  demoMode.checked = Boolean(state.config?.demoMode);
-  offset.value = String(state.config?.lyricOffsetMs || 0);
+  if (document.activeElement !== clientId) clientId.value = state.config?.spotifyClientId || "";
+  if (document.activeElement !== demoMode) demoMode.checked = Boolean(state.config?.demoMode);
+  if (document.activeElement !== offset) offset.value = String(state.config?.lyricOffsetMs || 0);
   renderLyrics(state);
 }
 
@@ -102,8 +138,11 @@ island.addEventListener("mouseenter", () => {
 
 document.getElementById("collapse").addEventListener("click", () => setExpanded(false));
 document.getElementById("previous").addEventListener("click", () => window.lyricsIsland.playback("previous"));
-play.addEventListener("click", () => window.lyricsIsland.playback(currentState?.playback?.isPlaying ? "pause" : "play"));
+document.getElementById("expandedPrevious").addEventListener("click", () => window.lyricsIsland.playback("previous"));
+play.addEventListener("click", () => window.lyricsIsland.playback(playbackAction()));
+expandedPlay.addEventListener("click", () => window.lyricsIsland.playback(playbackAction()));
 document.getElementById("next").addEventListener("click", () => window.lyricsIsland.playback("next"));
+document.getElementById("expandedNext").addEventListener("click", () => window.lyricsIsland.playback("next"));
 dashboard.addEventListener("click", () => window.lyricsIsland.openSpotifyDashboard());
 
 settings.addEventListener("submit", async (event) => {
@@ -138,3 +177,11 @@ connect.addEventListener("click", async () => {
 
 window.lyricsIsland.onState(render);
 window.lyricsIsland.getState().then(render);
+
+setIcon(document.getElementById("previous"), "previous");
+setIcon(document.getElementById("expandedPrevious"), "previous");
+setIcon(document.getElementById("next"), "next");
+setIcon(document.getElementById("expandedNext"), "next");
+setIcon(document.getElementById("collapse"), "close");
+setIcon(play, "pause");
+setIcon(expandedPlay, "pause");

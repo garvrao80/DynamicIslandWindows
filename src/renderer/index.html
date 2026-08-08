@@ -15,39 +15,57 @@
           <div id="lyric" class="lyric">Starting...</div>
         </div>
         <div class="controls">
-          <button id="previous" title="Previous" aria-label="Previous">‹</button>
-          <button id="play" title="Play or pause" aria-label="Play or pause">Ⅱ</button>
-          <button id="next" title="Next" aria-label="Next">›</button>
+          <button id="previous" class="icon-button" title="Previous" aria-label="Previous"></button>
+          <button id="play" class="icon-button primary" title="Play or pause" aria-label="Play or pause"></button>
+          <button id="next" class="icon-button" title="Next" aria-label="Next"></button>
         </div>
       </section>
 
       <section class="expanded">
-        <div class="expanded-header">
-          <div>
-            <div id="expandedTrack" class="expanded-track">Lyrics Island</div>
-            <div id="expandedArtist" class="expanded-artist">Windows floating lyrics</div>
-          </div>
-          <button id="collapse" title="Collapse" aria-label="Collapse">×</button>
+        <button id="collapse" class="icon-button close-button" title="Collapse" aria-label="Collapse"></button>
+
+        <div class="expanded-grid">
+          <aside class="now-playing">
+            <div id="expandedArt" class="expanded-art"></div>
+            <div class="expanded-meta">
+              <div id="expandedTrack" class="expanded-track">Lyrics Island</div>
+              <div id="expandedArtist" class="expanded-artist">Windows floating lyrics</div>
+            </div>
+
+            <div class="expanded-controls">
+              <button id="expandedPrevious" class="icon-button" title="Previous" aria-label="Previous"></button>
+              <button id="expandedPlay" class="icon-button primary" title="Play or pause" aria-label="Play or pause"></button>
+              <button id="expandedNext" class="icon-button" title="Next" aria-label="Next"></button>
+            </div>
+
+            <form id="settings" class="settings">
+              <input id="clientId" name="clientId" placeholder="Spotify Client ID" autocomplete="off" />
+              <div class="settings-row">
+                <label class="toggle">
+                  <input id="demoMode" type="checkbox" />
+                  <span>Demo</span>
+                </label>
+                <label class="offset">
+                  <span>Offset</span>
+                  <input id="offset" type="number" step="100" />
+                </label>
+              </div>
+              <div class="settings-actions">
+                <button id="dashboard" type="button">Dashboard</button>
+                <button id="connect" type="button">Connect</button>
+                <button type="submit">Save</button>
+              </div>
+            </form>
+
+            <div id="status" class="status">Ready</div>
+          </aside>
+
+          <section class="lyric-panel">
+            <div class="lyrics-window">
+              <div id="lyricsList" class="lyrics-list"></div>
+            </div>
+          </section>
         </div>
-
-        <div id="lyricsList" class="lyrics-list"></div>
-
-        <form id="settings" class="settings">
-          <input id="clientId" name="clientId" placeholder="Spotify Client ID" autocomplete="off" />
-          <label class="toggle">
-            <input id="demoMode" type="checkbox" />
-            <span>Demo</span>
-          </label>
-          <label class="offset">
-            <span>Offset</span>
-            <input id="offset" type="number" step="100" />
-          </label>
-          <button id="dashboard" type="button">Dashboard</button>
-          <button id="connect" type="button">Connect</button>
-          <button type="submit">Save</button>
-        </form>
-
-        <div id="status" class="status">Ready</div>
       </section>
     </main>
 
