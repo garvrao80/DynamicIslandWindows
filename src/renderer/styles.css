@@ -192,10 +192,10 @@ button:hover {
 
 .now-playing {
   display: grid;
-  grid-template-rows: 174px auto 48px 16px;
+  grid-template-rows: 174px auto 48px 30px 16px;
   align-content: center;
   justify-items: center;
-  gap: 13px;
+  gap: 11px;
   min-width: 0;
   padding-right: 4px;
 }
@@ -230,14 +230,49 @@ button:hover {
   justify-content: center;
 }
 
+.progress {
+  display: grid;
+  grid-template-columns: 34px 1fr 34px;
+  align-items: center;
+  gap: 8px;
+  width: 260px;
+  -webkit-app-region: no-drag;
+}
+
+.progress-time {
+  color: rgba(247, 248, 251, 0.68);
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+}
+
+.progress-track {
+  position: relative;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: #4ee3b1;
+  box-shadow: 0 0 14px rgba(78, 227, 177, 0.42);
+  transition: width 260ms linear;
+}
+
 .lyric-panel {
   display: grid;
   align-items: center;
   min-width: 0;
-  padding: 12px 26px 12px 0;
+  justify-items: end;
+  padding: 0 12px 0 0;
 }
 
 .lyrics-window {
+  width: min(100%, 390px);
   height: 252px;
   overflow: hidden;
   mask-image: linear-gradient(transparent, black 18%, black 82%, transparent);
@@ -281,7 +316,7 @@ button:hover {
   font-size: 21px;
   font-weight: 800;
   opacity: 1;
-  transform: translateX(8px) scale(1);
+  transform: translateX(14px) scale(1);
 }
 
 .settings-popover {

@@ -17,6 +17,9 @@ const dashboard = document.getElementById("dashboard");
 const play = document.getElementById("play");
 const expandedPlay = document.getElementById("expandedPlay");
 const compact = document.querySelector(".compact");
+const progressElapsed = document.getElementById("progressElapsed");
+const progressDuration = document.getElementById("progressDuration");
+const progressFill = document.getElementById("progressFill");
 
 let expanded = false;
 let currentState = null;
@@ -49,6 +52,24 @@ function playbackAction() {
 function applyArtwork(node, artworkUrl) {
   if (!node) return;
   node.style.backgroundImage = artworkUrl ? `url("${artworkUrl}")` : "";
+}
+
+function formatTime(ms = 0) {
+  const safeMs = Math.max(0, Number(ms) || 0);
+  const totalSeconds = Math.floor(safeMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function renderProgress(playback = {}) {
+  const progressMs = Math.max(0, playback.progressMs || 0);
+  const durationMs = Math.max(0, playback.durationMs || 0);
+  const percent = durationMs > 0 ? Math.min(100, (progressMs / durationMs) * 100) : 0;
+
+  progressElapsed.textContent = formatTime(progressMs);
+  progressDuration.textContent = formatTime(durationMs);
+  progressFill.style.width = `${percent}%`;
 }
 
 function updatePlayIcons(isPlaying) {
@@ -134,6 +155,7 @@ function render(state) {
   if (document.activeElement !== clientId) clientId.value = state.config?.spotifyClientId || "";
   if (document.activeElement !== demoMode) demoMode.checked = Boolean(state.config?.demoMode);
   if (document.activeElement !== offset) offset.value = String(state.config?.lyricOffsetMs || 0);
+  renderProgress(playback);
   renderLyrics(state);
 }
 
