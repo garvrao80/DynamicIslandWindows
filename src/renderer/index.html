@@ -36,26 +36,8 @@
               <button id="expandedPrevious" class="icon-button" title="Previous" aria-label="Previous"></button>
               <button id="expandedPlay" class="icon-button primary" title="Play or pause" aria-label="Play or pause"></button>
               <button id="expandedNext" class="icon-button" title="Next" aria-label="Next"></button>
+              <button id="settingsToggle" class="icon-button" title="Settings" aria-label="Settings"></button>
             </div>
-
-            <form id="settings" class="settings">
-              <input id="clientId" name="clientId" placeholder="Spotify Client ID" autocomplete="off" />
-              <div class="settings-row">
-                <label class="toggle">
-                  <input id="demoMode" type="checkbox" />
-                  <span>Demo</span>
-                </label>
-                <label class="offset">
-                  <span>Offset</span>
-                  <input id="offset" type="number" step="100" />
-                </label>
-              </div>
-              <div class="settings-actions">
-                <button id="dashboard" type="button">Dashboard</button>
-                <button id="connect" type="button">Connect</button>
-                <button type="submit">Save</button>
-              </div>
-            </form>
 
             <div id="status" class="status">Ready</div>
           </aside>
@@ -66,6 +48,25 @@
             </div>
           </section>
         </div>
+
+        <form id="settings" class="settings-popover" aria-label="Settings">
+          <input id="clientId" name="clientId" placeholder="Spotify Client ID" autocomplete="off" />
+          <div class="settings-row">
+            <label class="toggle">
+              <input id="demoMode" type="checkbox" />
+              <span>Demo</span>
+            </label>
+            <label class="offset">
+              <span>Offset</span>
+              <input id="offset" type="number" step="100" />
+            </label>
+          </div>
+          <div class="settings-actions">
+            <button id="dashboard" type="button">Dashboard</button>
+            <button id="connect" type="button">Connect</button>
+            <button type="submit">Save</button>
+          </div>
+        </form>
       </section>
     </main>
 

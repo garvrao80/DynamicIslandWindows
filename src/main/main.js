@@ -274,7 +274,26 @@ ipcMain.handle("spotify:connect", async () => {
 });
 
 ipcMain.handle("spotify:control", async (_event, action) => {
-  if (config.demoMode) return state;
+  if (config.demoMode) {
+    if (action === "play" || action === "pause") {
+      demoPlayback.isPlaying = action === "play";
+      publishState({
+        status: "Demo mode",
+        playback: { ...demoPlayback },
+        lyrics: currentLyrics,
+        activeLyricIndex: activeLyricIndex(demoPlayback, currentLyrics)
+      });
+    }
+    return state;
+  }
+
+  if ((action === "play" || action === "pause") && state.playback) {
+    publishState({
+      status: action === "play" ? "Playing" : "Paused",
+      playback: { ...state.playback, isPlaying: action === "play" }
+    });
+  }
+
   await controlPlayback(config, action);
   await refreshPlayback();
   return state;
