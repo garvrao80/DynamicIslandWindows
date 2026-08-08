@@ -66,6 +66,12 @@ function sendPlayback(action) {
   window.lyricsIsland.playback(action);
 }
 
+function handlePlaybackClick(event, action) {
+  event.preventDefault();
+  event.stopPropagation();
+  sendPlayback(action);
+}
+
 function currentLyric(state) {
   const lines = state.lyrics?.synced || [];
   const index = state.activeLyricIndex;
@@ -156,12 +162,12 @@ compact.addEventListener("click", (event) => {
 });
 
 document.getElementById("collapse").addEventListener("click", () => setExpanded(false));
-document.getElementById("previous").addEventListener("click", () => sendPlayback("previous"));
-document.getElementById("expandedPrevious").addEventListener("click", () => sendPlayback("previous"));
-play.addEventListener("click", () => sendPlayback(playbackAction()));
-expandedPlay.addEventListener("click", () => sendPlayback(playbackAction()));
-document.getElementById("next").addEventListener("click", () => sendPlayback("next"));
-document.getElementById("expandedNext").addEventListener("click", () => sendPlayback("next"));
+document.getElementById("previous").addEventListener("click", (event) => handlePlaybackClick(event, "previous"));
+document.getElementById("expandedPrevious").addEventListener("click", (event) => handlePlaybackClick(event, "previous"));
+play.addEventListener("click", (event) => handlePlaybackClick(event, playbackAction()));
+expandedPlay.addEventListener("click", (event) => handlePlaybackClick(event, playbackAction()));
+document.getElementById("next").addEventListener("click", (event) => handlePlaybackClick(event, "next"));
+document.getElementById("expandedNext").addEventListener("click", (event) => handlePlaybackClick(event, "next"));
 settingsToggle.addEventListener("click", () => island.classList.toggle("settings-open"));
 dashboard.addEventListener("click", () => window.lyricsIsland.openSpotifyDashboard());
 
