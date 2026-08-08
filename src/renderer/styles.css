@@ -190,7 +190,7 @@ button:hover {
 
 .settings {
   display: grid;
-  grid-template-columns: 1fr auto 96px 84px 62px;
+  grid-template-columns: 1fr auto 96px 98px 84px 62px;
   gap: 8px;
   align-items: center;
   -webkit-app-region: no-drag;

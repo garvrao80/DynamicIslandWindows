@@ -11,6 +11,7 @@ const demoMode = document.getElementById("demoMode");
 const offset = document.getElementById("offset");
 const settings = document.getElementById("settings");
 const connect = document.getElementById("connect");
+const dashboard = document.getElementById("dashboard");
 const play = document.getElementById("play");
 
 let expanded = false;
@@ -103,6 +104,7 @@ document.getElementById("collapse").addEventListener("click", () => setExpanded(
 document.getElementById("previous").addEventListener("click", () => window.lyricsIsland.playback("previous"));
 play.addEventListener("click", () => window.lyricsIsland.playback(currentState?.playback?.isPlaying ? "pause" : "play"));
 document.getElementById("next").addEventListener("click", () => window.lyricsIsland.playback("next"));
+dashboard.addEventListener("click", () => window.lyricsIsland.openSpotifyDashboard());
 
 settings.addEventListener("submit", async (event) => {
   event.preventDefault();

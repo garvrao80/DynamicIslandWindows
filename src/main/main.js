@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell } = require("electron");
 const path = require("node:path");
 const { readConfig, writeConfig } = require("./config");
 const { fetchLyrics } = require("./lyrics");
@@ -278,6 +278,11 @@ ipcMain.handle("spotify:control", async (_event, action) => {
   await controlPlayback(config, action);
   await refreshPlayback();
   return state;
+});
+
+ipcMain.handle("spotify:dashboard", () => {
+  shell.openExternal("https://developer.spotify.com/dashboard");
+  return true;
 });
 
 ipcMain.handle("island:expanded", (_event, expanded) => {
