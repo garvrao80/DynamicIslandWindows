@@ -16,6 +16,7 @@ const connect = document.getElementById("connect");
 const dashboard = document.getElementById("dashboard");
 const play = document.getElementById("play");
 const expandedPlay = document.getElementById("expandedPlay");
+const compact = document.querySelector(".compact");
 
 let expanded = false;
 let currentState = null;
@@ -149,9 +150,9 @@ function setExpanded(nextExpanded) {
   window.lyricsIsland.setExpanded(false);
 }
 
-island.addEventListener("dblclick", () => setExpanded(!expanded));
-island.addEventListener("mouseenter", () => {
-  if (!expanded) setExpanded(true);
+compact.addEventListener("click", (event) => {
+  if (event.target.closest("button")) return;
+  setExpanded(true);
 });
 
 document.getElementById("collapse").addEventListener("click", () => setExpanded(false));
