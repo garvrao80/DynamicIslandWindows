@@ -1,7 +1,15 @@
 :root {
   color-scheme: dark;
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family:
+    "Segoe UI Variable",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
   background: transparent;
+  --accent: #4ee3b1;
+  --ink: #f5f6f9;
+  --ink-dim: rgba(245, 246, 249, 0.62);
 }
 
 * {
@@ -31,20 +39,35 @@ input {
   height: 68px;
   position: relative;
   overflow: hidden;
-  color: #f7f8fb;
+  color: var(--ink);
   background:
-    radial-gradient(circle at 18% 18%, rgba(38, 179, 139, 0.18), transparent 28%),
-    radial-gradient(circle at 82% 26%, rgba(180, 137, 62, 0.14), transparent 34%),
-    rgba(8, 9, 10, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+    radial-gradient(circle at 18% 0%, rgba(78, 227, 177, 0.16), transparent 40%),
+    radial-gradient(circle at 85% 100%, rgba(180, 137, 62, 0.12), transparent 45%),
+    rgba(14, 15, 17, 0.72);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 999px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 10px 30px rgba(0, 0, 0, 0.45),
+    0 2px 8px rgba(0, 0, 0, 0.35);
   -webkit-app-region: drag;
   will-change: width, height, border-radius;
   transition:
     width 360ms cubic-bezier(0.34, 1.2, 0.64, 1),
     height 360ms cubic-bezier(0.34, 1.2, 0.64, 1),
-    border-radius 360ms cubic-bezier(0.34, 1.2, 0.64, 1);
+    border-radius 360ms cubic-bezier(0.34, 1.2, 0.64, 1),
+    box-shadow 360ms ease;
+}
+
+.island.expanded-mode {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .island.expanded-mode {
@@ -83,13 +106,16 @@ input {
     #202226;
   background-size: cover;
   background-position: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
 }
 
 .art {
   width: 48px;
   height: 48px;
-  border-radius: 50%;
-  box-shadow: 0 0 20px rgba(78, 227, 177, 0.22);
+  border-radius: 16px;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    0 0 16px rgba(78, 227, 177, 0.18);
   -webkit-app-region: no-drag;
 }
 
@@ -103,28 +129,29 @@ input {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 750;
-  letter-spacing: 0;
+  font-weight: 600;
+  letter-spacing: -0.1px;
 }
 
 .track {
   max-width: 150px;
-  font-size: 14px;
+  font-size: 13.5px;
 }
 
 .lyric,
 .expanded-artist,
 .status {
   overflow: hidden;
-  color: rgba(247, 248, 251, 0.68);
+  color: var(--ink-dim);
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 450;
 }
 
 .lyric {
   max-width: 150px;
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: 3px;
+  font-size: 11.5px;
 }
 
 .controls,
@@ -137,13 +164,23 @@ input {
 
 button {
   border: 0;
-  color: #f7f8fb;
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
   -webkit-app-region: no-drag;
+  transition:
+    background 160ms ease,
+    transform 120ms cubic-bezier(0.34, 1.4, 0.64, 1),
+    box-shadow 160ms ease;
 }
 
 button:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+button:active {
+  transform: scale(0.9);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .icon-button {
@@ -153,12 +190,23 @@ button:hover {
   height: 36px;
   border-radius: 50%;
   padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .icon-button.primary {
   width: 42px;
   height: 42px;
-  background: rgba(255, 255, 255, 0.16);
+  color: #0b0c0e;
+  background: var(--ink);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.icon-button.primary:hover {
+  background: #ffffff;
+}
+
+.icon-button.primary:active {
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .icon-button svg {
@@ -244,10 +292,10 @@ button:hover {
 .expanded-art {
   width: 150px;
   height: 150px;
-  border-radius: 26px;
+  border-radius: 28px;
   box-shadow:
-    0 18px 44px rgba(0, 0, 0, 0.35),
-    0 0 46px rgba(78, 227, 177, 0.18);
+    0 18px 44px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(78, 227, 177, 0.16);
 }
 
 .expanded-meta {
@@ -289,10 +337,10 @@ button:hover {
 
 .progress-track {
   position: relative;
-  height: 5px;
-  overflow: hidden;
+  height: 4px;
+  overflow: visible;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.18);
   cursor: pointer;
 }
 
@@ -303,12 +351,32 @@ button:hover {
 }
 
 .progress-fill {
+  position: relative;
   width: 0%;
   height: 100%;
   border-radius: inherit;
-  background: #4ee3b1;
-  box-shadow: 0 0 14px rgba(78, 227, 177, 0.42);
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(78, 227, 177, 0.5);
   transition: width 260ms linear;
+}
+
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.progress-track:hover .progress-fill::after {
+  opacity: 1;
 }
 
 .lyric-panel {
@@ -337,9 +405,9 @@ button:hover {
 
 .lyric-line {
   padding: 6px 16px;
-  color: rgba(247, 248, 251, 0.34);
+  color: rgba(247, 248, 251, 0.3);
   font-size: 17px;
-  font-weight: 650;
+  font-weight: 550;
   line-height: 1.4;
   text-align: center;
   opacity: 0.56;
@@ -374,10 +442,14 @@ button:hover {
   align-content: start;
   width: 304px;
   padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 24px;
-  background: rgba(17, 18, 20, 0.98);
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.44);
+  background: rgba(20, 21, 24, 0.82);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 18px 60px rgba(0, 0, 0, 0.5);
   opacity: 0;
   pointer-events: none;
   transform: translateY(10px) scale(0.98);
