@@ -193,20 +193,20 @@ function setExpanded(nextExpanded) {
   expanded = nextExpanded;
 
   if (expanded) {
-    // Resize window first (instant, transparent so no visible snap),
-    // then apply CSS class so the visual animation runs on the full canvas
+    // 1. Expand transparent native window instantly
     window.lyricsIsland.setExpanded(true);
+    // 2. Add class so CSS can smoothly animate .island size inside the large window
     expandTimer = setTimeout(() => {
       island.classList.add("expanded-mode");
-    }, 40);
+    }, 20);
   } else {
-    // Remove CSS class first → let CSS animate the collapse,
-    // then shrink the window after animation completes
+    // 1. Remove class so CSS shrinks .island size smoothly
     island.classList.remove("expanded-mode");
     island.classList.remove("settings-open");
+    // 2. Wait for CSS animation (360ms) to finish before shrinking native window
     expandTimer = setTimeout(() => {
       window.lyricsIsland.setExpanded(false);
-    }, 320);
+    }, 380);
   }
 }
 
