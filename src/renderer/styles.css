@@ -40,11 +40,12 @@ input {
   -webkit-app-region: drag;
   transition:
     border-radius 180ms ease,
-    background 180ms ease;
+    background 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .island.expanded-mode {
-  border-radius: 34px;
+  border-radius: 32px;
 }
 
 .compact {
@@ -124,7 +125,7 @@ button:hover {
 .expanded {
   display: none;
   height: 100%;
-  padding: 18px;
+  padding: 22px 24px 18px;
 }
 
 .expanded-mode .compact {
@@ -133,8 +134,8 @@ button:hover {
 
 .expanded-mode .expanded {
   display: grid;
-  grid-template-rows: auto 1fr auto auto;
-  gap: 12px;
+  grid-template-rows: 48px 1fr 38px 16px;
+  gap: 14px;
 }
 
 .expanded-header {
@@ -145,12 +146,12 @@ button:hover {
 }
 
 .expanded-track {
-  max-width: 420px;
+  max-width: 510px;
   font-size: 18px;
 }
 
 .expanded-artist {
-  max-width: 420px;
+  max-width: 510px;
   margin-top: 3px;
   font-size: 13px;
 }
@@ -162,31 +163,34 @@ button:hover {
 
 .lyrics-list {
   display: grid;
+  grid-auto-rows: 28px;
   align-content: center;
-  min-height: 92px;
+  min-height: 140px;
   overflow: hidden;
-  padding: 8px 0;
+  padding: 4px 0;
+  mask-image: linear-gradient(transparent, black 18%, black 82%, transparent);
 }
 
 .lyric-line {
   overflow: hidden;
-  padding: 3px 0;
+  height: 28px;
+  line-height: 28px;
   color: rgba(247, 248, 251, 0.38);
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: color 150ms ease, transform 150ms ease, font-size 150ms ease;
+  transition: color 150ms ease, transform 150ms ease, font-size 150ms ease, opacity 150ms ease;
 }
 
 .lyric-line.active {
   color: #ffffff;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 750;
   transform: translateX(4px);
 }
 
 .settings {
   display: grid;
-  grid-template-columns: 1fr auto 94px 72px 54px;
+  grid-template-columns: 1fr auto 96px 84px 62px;
   gap: 8px;
   align-items: center;
   -webkit-app-region: no-drag;

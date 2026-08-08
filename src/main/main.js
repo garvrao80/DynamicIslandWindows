@@ -13,6 +13,7 @@ let mainWindow;
 let tray;
 let config;
 let timer;
+let boundsAnimation;
 let lastTrackKey = "";
 let currentLyrics = { synced: [], plain: "", source: "none" };
 let state = {
@@ -70,16 +71,50 @@ function createIcon() {
   return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`);
 }
 
-function setWindowBounds(expanded = false) {
-  if (!mainWindow) return;
-
+function targetBounds(expanded = false) {
   const display = screen.getPrimaryDisplay();
   const { x, y, width } = display.workArea;
-  const size = expanded ? { width: 520, height: 268 } : { width: 312, height: 74 };
+  const size = expanded ? { width: 620, height: 336 } : { width: 312, height: 74 };
   const top = y + 18;
   const left = x + Math.round((width - size.width) / 2);
 
-  mainWindow.setBounds({ x: left, y: top, ...size }, true);
+  return { x: left, y: top, ...size };
+}
+
+function setWindowBounds(expanded = false, animated = true) {
+  if (!mainWindow) return;
+
+  const target = targetBounds(expanded);
+
+  if (!animated) {
+    mainWindow.setBounds(target, false);
+    return;
+  }
+
+  clearInterval(boundsAnimation);
+
+  const start = mainWindow.getBounds();
+  const startedAt = Date.now();
+  const duration = 150;
+
+  boundsAnimation = setInterval(() => {
+    const elapsed = Date.now() - startedAt;
+    const progress = Math.min(1, elapsed / duration);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const next = {};
+
+    for (const key of ["x", "y", "width", "height"]) {
+      next[key] = Math.round(start[key] + (target[key] - start[key]) * eased);
+    }
+
+    mainWindow.setBounds(next, false);
+
+    if (progress >= 1) {
+      clearInterval(boundsAnimation);
+      boundsAnimation = null;
+      mainWindow.setBounds(target, false);
+    }
+  }, 16);
 }
 
 function createWindow() {
@@ -103,7 +138,7 @@ function createWindow() {
 
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
-  setWindowBounds(false);
+  setWindowBounds(false, false);
   mainWindow.once("ready-to-show", () => mainWindow.show());
 }
 
@@ -245,6 +280,7 @@ ipcMain.handle("spotify:control", async (_event, action) => {
   return state;
 });
 
-ipcMain.on("island:expanded", (_event, expanded) => {
-  setWindowBounds(Boolean(expanded));
+ipcMain.handle("island:expanded", (_event, expanded) => {
+  setWindowBounds(Boolean(expanded), true);
+  return true;
 });

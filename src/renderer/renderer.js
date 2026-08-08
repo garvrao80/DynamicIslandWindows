@@ -15,6 +15,7 @@ const play = document.getElementById("play");
 
 let expanded = false;
 let currentState = null;
+let expandTimer = null;
 
 function currentLyric(state) {
   const lines = state.lyrics?.synced || [];
@@ -60,8 +61,8 @@ function render(state) {
   lyric.textContent = currentLyric(state);
   expandedTrack.textContent = title;
   expandedArtist.textContent = artist;
-  statusNode.textContent = `${state.status || "Ready"} · ${state.lyrics?.source || "none"}`;
-  play.textContent = playback.isPlaying ? "Ⅱ" : "▶";
+  statusNode.textContent = `${state.status || "Ready"} - ${state.lyrics?.source || "none"}`;
+  play.textContent = playback.isPlaying ? "||" : ">";
 
   if (playback.artworkUrl) {
     art.style.backgroundImage = `url("${playback.artworkUrl}")`;
@@ -76,9 +77,21 @@ function render(state) {
 }
 
 function setExpanded(nextExpanded) {
+  clearTimeout(expandTimer);
+  if (expanded === nextExpanded) return;
+
   expanded = nextExpanded;
-  island.classList.toggle("expanded-mode", expanded);
-  window.lyricsIsland.setExpanded(expanded);
+
+  if (expanded) {
+    window.lyricsIsland.setExpanded(true);
+    expandTimer = setTimeout(() => {
+      island.classList.add("expanded-mode");
+    }, 70);
+    return;
+  }
+
+  island.classList.remove("expanded-mode");
+  window.lyricsIsland.setExpanded(false);
 }
 
 island.addEventListener("dblclick", () => setExpanded(!expanded));
@@ -101,12 +114,24 @@ settings.addEventListener("submit", async (event) => {
 });
 
 connect.addEventListener("click", async () => {
+  statusNode.textContent = "Opening Spotify sign in...";
+
+  if (!clientId.value.trim()) {
+    statusNode.textContent = "Paste your Spotify Client ID first.";
+    return;
+  }
+
   await window.lyricsIsland.saveConfig({
     spotifyClientId: clientId.value.trim(),
     demoMode: false,
     lyricOffsetMs: Number(offset.value || 0)
   });
-  await window.lyricsIsland.connectSpotify();
+
+  try {
+    await window.lyricsIsland.connectSpotify();
+  } catch (error) {
+    statusNode.textContent = error.message || "Spotify connection failed.";
+  }
 });
 
 window.lyricsIsland.onState(render);
