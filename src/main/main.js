@@ -75,7 +75,7 @@ function createIcon() {
 function targetBounds(expanded = false) {
   const display = screen.getPrimaryDisplay();
   const { x, y, width } = display.workArea;
-  const size = expanded ? { width: 700, height: 326 } : { width: 390, height: 84 };
+  const size = expanded ? { width: 700, height: 326 } : { width: 340, height: 68 };
   const top = y + 18;
   const left = x + Math.round((width - size.width) / 2);
 
@@ -120,10 +120,11 @@ function setWindowBounds(expanded = false, animated = true) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 312,
-    height: 74,
+    width: 340,
+    height: 68,
     frame: false,
     transparent: true,
+    backgroundColor: "#00000000",
     resizable: false,
     movable: true,
     show: false,

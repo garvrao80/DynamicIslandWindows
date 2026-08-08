@@ -31,31 +31,30 @@ input {
   background:
     radial-gradient(circle at 18% 18%, rgba(38, 179, 139, 0.18), transparent 28%),
     radial-gradient(circle at 82% 26%, rgba(180, 137, 62, 0.14), transparent 34%),
-    rgba(8, 9, 10, 0.985);
+    rgba(8, 9, 10, 0.97);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
-  box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  clip-path: inset(0 round 999px);
   -webkit-app-region: drag;
   transition:
     border-radius 180ms ease,
-    background 180ms ease,
-    box-shadow 180ms ease;
+    clip-path 180ms ease,
+    background 180ms ease;
 }
 
 .island.expanded-mode {
   border-radius: 32px;
+  clip-path: inset(0 round 32px);
 }
 
 .compact {
   display: grid;
-  grid-template-columns: 60px minmax(0, 1fr) 132px;
+  grid-template-columns: 52px minmax(0, 1fr) 120px;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  height: 84px;
-  padding: 11px 16px;
+  height: 68px;
+  padding: 8px 14px;
   cursor: pointer;
   -webkit-app-region: no-drag;
 }
@@ -70,10 +69,10 @@ input {
 }
 
 .art {
-  width: 58px;
-  height: 58px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  box-shadow: 0 0 30px rgba(78, 227, 177, 0.24);
+  box-shadow: 0 0 20px rgba(78, 227, 177, 0.22);
 }
 
 .meta {
