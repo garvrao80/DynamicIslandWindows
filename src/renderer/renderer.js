@@ -190,20 +190,24 @@ function render(state) {
 function setExpanded(nextExpanded) {
   clearTimeout(expandTimer);
   if (expanded === nextExpanded) return;
-
   expanded = nextExpanded;
 
   if (expanded) {
+    // Resize window first (instant, transparent so no visible snap),
+    // then apply CSS class so the visual animation runs on the full canvas
     window.lyricsIsland.setExpanded(true);
     expandTimer = setTimeout(() => {
       island.classList.add("expanded-mode");
-    }, 70);
-    return;
+    }, 40);
+  } else {
+    // Remove CSS class first → let CSS animate the collapse,
+    // then shrink the window after animation completes
+    island.classList.remove("expanded-mode");
+    island.classList.remove("settings-open");
+    expandTimer = setTimeout(() => {
+      window.lyricsIsland.setExpanded(false);
+    }, 320);
   }
-
-  island.classList.remove("expanded-mode");
-  island.classList.remove("settings-open");
-  window.lyricsIsland.setExpanded(false);
 }
 
 compact.addEventListener("click", (event) => {
