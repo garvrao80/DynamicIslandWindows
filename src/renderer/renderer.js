@@ -20,6 +20,7 @@ const compact = document.querySelector(".compact");
 const progressElapsed = document.getElementById("progressElapsed");
 const progressDuration = document.getElementById("progressDuration");
 const progressFill = document.getElementById("progressFill");
+const progressTrack = document.querySelector(".progress-track");
 
 let expanded = false;
 let currentState = null;
@@ -70,6 +71,33 @@ function renderProgress(playback = {}) {
   progressElapsed.textContent = formatTime(progressMs);
   progressDuration.textContent = formatTime(durationMs);
   progressFill.style.width = `${percent}%`;
+}
+
+function lyricIndexForProgress(progressMs) {
+  const lines = currentState?.lyrics?.synced || [];
+  let index = -1;
+
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].timeMs <= progressMs) index = i;
+    else break;
+  }
+
+  return index;
+}
+
+function seekFromPointer(event) {
+  const playback = currentState?.playback;
+  if (!playback?.durationMs) return;
+
+  const rect = progressTrack.getBoundingClientRect();
+  const percent = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  const positionMs = Math.round(playback.durationMs * percent);
+
+  playback.progressMs = positionMs;
+  currentState.activeLyricIndex = lyricIndexForProgress(positionMs);
+  renderProgress(playback);
+  renderLyrics(currentState);
+  window.lyricsIsland.seek(positionMs);
 }
 
 function updatePlayIcons(isPlaying) {
@@ -132,7 +160,7 @@ function renderLyrics(state) {
   });
 
   const lineHeight = 36;
-  const centerOffset = 108;
+  const centerOffset = 99;
   lyricsList.style.transform = lines.length ? `translateY(${centerOffset - index * lineHeight}px)` : "translateY(70px)";
 }
 
@@ -190,6 +218,11 @@ play.addEventListener("click", (event) => handlePlaybackClick(event, playbackAct
 expandedPlay.addEventListener("click", (event) => handlePlaybackClick(event, playbackAction()));
 document.getElementById("next").addEventListener("click", (event) => handlePlaybackClick(event, "next"));
 document.getElementById("expandedNext").addEventListener("click", (event) => handlePlaybackClick(event, "next"));
+progressTrack.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  seekFromPointer(event);
+});
 settingsToggle.addEventListener("click", () => island.classList.toggle("settings-open"));
 dashboard.addEventListener("click", () => window.lyricsIsland.openSpotifyDashboard());
 

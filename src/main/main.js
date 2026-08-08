@@ -6,7 +6,8 @@ const {
   startSpotifyLogin,
   refreshAccessToken,
   getCurrentPlayback,
-  controlPlayback
+  controlPlayback,
+  seekPlayback
 } = require("./spotify");
 
 let mainWindow;
@@ -74,7 +75,7 @@ function createIcon() {
 function targetBounds(expanded = false) {
   const display = screen.getPrimaryDisplay();
   const { x, y, width } = display.workArea;
-  const size = expanded ? { width: 760, height: 360 } : { width: 390, height: 84 };
+  const size = expanded ? { width: 700, height: 326 } : { width: 390, height: 84 };
   const top = y + 18;
   const left = x + Math.round((width - size.width) / 2);
 
@@ -295,6 +296,37 @@ ipcMain.handle("spotify:control", async (_event, action) => {
   }
 
   await controlPlayback(config, action);
+  await refreshPlayback();
+  return state;
+});
+
+ipcMain.handle("spotify:seek", async (_event, positionMs) => {
+  const safePosition = Math.max(0, Math.round(Number(positionMs) || 0));
+
+  if (config.demoMode) {
+    demoPlayback.progressMs = Math.min(safePosition, demoPlayback.durationMs);
+    publishState({
+      status: "Demo mode",
+      playback: { ...demoPlayback },
+      lyrics: currentLyrics,
+      activeLyricIndex: activeLyricIndex(demoPlayback, currentLyrics)
+    });
+    return state;
+  }
+
+  if (state.playback) {
+    const durationMs = state.playback.durationMs || safePosition;
+    publishState({
+      status: "Seeking",
+      playback: {
+        ...state.playback,
+        progressMs: Math.min(safePosition, durationMs)
+      },
+      activeLyricIndex: activeLyricIndex({ ...state.playback, progressMs: safePosition }, currentLyrics)
+    });
+  }
+
+  await seekPlayback(config, safePosition);
   await refreshPlayback();
   return state;
 });

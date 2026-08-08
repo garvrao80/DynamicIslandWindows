@@ -192,10 +192,16 @@ async function controlPlayback(config, action) {
   await spotifyRequest(config, endpoint, { method });
 }
 
+async function seekPlayback(config, positionMs) {
+  const safePosition = Math.max(0, Math.round(Number(positionMs) || 0));
+  await spotifyRequest(config, `/me/player/seek?position_ms=${safePosition}`, { method: "PUT" });
+}
+
 module.exports = {
   redirectUri,
   startSpotifyLogin,
   refreshAccessToken,
   getCurrentPlayback,
-  controlPlayback
+  controlPlayback,
+  seekPlayback
 };

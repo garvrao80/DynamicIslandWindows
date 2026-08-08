@@ -185,25 +185,25 @@ button:hover {
 
 .expanded-grid {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 30px;
+  grid-template-columns: 276px minmax(0, 1fr);
+  gap: 22px;
   height: 100%;
 }
 
 .now-playing {
   display: grid;
-  grid-template-rows: 174px auto 48px 30px 16px;
+  grid-template-rows: 150px auto 46px 28px 16px;
   align-content: center;
   justify-items: center;
-  gap: 11px;
+  gap: 9px;
   min-width: 0;
   padding-right: 4px;
 }
 
 .expanded-art {
-  width: 172px;
-  height: 172px;
-  border-radius: 30px;
+  width: 150px;
+  height: 150px;
+  border-radius: 26px;
   box-shadow:
     0 18px 44px rgba(0, 0, 0, 0.35),
     0 0 46px rgba(78, 227, 177, 0.18);
@@ -215,13 +215,13 @@ button:hover {
 }
 
 .expanded-track {
-  max-width: 280px;
-  font-size: 25px;
+  max-width: 256px;
+  font-size: 22px;
   line-height: 1.14;
 }
 
 .expanded-artist {
-  max-width: 280px;
+  max-width: 256px;
   margin-top: 6px;
   font-size: 14px;
 }
@@ -235,7 +235,7 @@ button:hover {
   grid-template-columns: 34px 1fr 34px;
   align-items: center;
   gap: 8px;
-  width: 260px;
+  width: 248px;
   -webkit-app-region: no-drag;
 }
 
@@ -252,6 +252,13 @@ button:hover {
   overflow: hidden;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.22);
+  cursor: pointer;
+}
+
+.progress-track::after {
+  content: "";
+  position: absolute;
+  inset: -8px 0;
 }
 
 .progress-fill {
@@ -267,13 +274,13 @@ button:hover {
   display: grid;
   align-items: center;
   min-width: 0;
-  justify-items: end;
-  padding: 0 12px 0 0;
+  justify-items: center;
+  padding: 0 6px 0 8px;
 }
 
 .lyrics-window {
-  width: min(100%, 390px);
-  height: 252px;
+  width: min(100%, 368px);
+  height: 234px;
   overflow: hidden;
   mask-image: linear-gradient(transparent, black 18%, black 82%, transparent);
 }
@@ -295,6 +302,7 @@ button:hover {
   font-weight: 650;
   line-height: 36px;
   text-overflow: ellipsis;
+  text-align: center;
   white-space: nowrap;
   opacity: 0.56;
   transform: translateX(0) scale(0.98);
@@ -316,7 +324,7 @@ button:hover {
   font-size: 21px;
   font-weight: 800;
   opacity: 1;
-  transform: translateX(14px) scale(1);
+  transform: scale(1);
 }
 
 .settings-popover {
