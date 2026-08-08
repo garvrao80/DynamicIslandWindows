@@ -69,9 +69,11 @@ input {
   opacity: 1;
   transform: scale(1);
   will-change: opacity, transform;
+  /* Runs when collapsing (returning to pill) */
   transition:
-    opacity 160ms ease,
-    transform 160ms cubic-bezier(0.34, 1.2, 0.64, 1);
+    opacity 240ms ease 100ms,
+    transform 240ms cubic-bezier(0.34, 1.2, 0.64, 1) 100ms;
+  -webkit-app-region: no-drag;
 }
 
 .art,
@@ -185,9 +187,10 @@ button:hover {
   opacity: 0;
   transform: scale(0.96);
   pointer-events: none;
+  /* Runs when collapsing (returning to pill) */
   transition:
-    opacity 260ms ease,
-    transform 280ms cubic-bezier(0.34, 1.2, 0.64, 1);
+    opacity 120ms ease,
+    transform 120ms ease;
   will-change: opacity, transform;
 }
 
@@ -195,13 +198,20 @@ button:hover {
   opacity: 0;
   pointer-events: none;
   transform: scale(0.94);
+  /* Runs when expanding */
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
 }
 
 .expanded-mode .expanded {
   opacity: 1;
   transform: scale(1);
   pointer-events: auto;
-  transition-delay: 40ms;
+  /* Runs when expanding */
+  transition:
+    opacity 260ms ease 60ms,
+    transform 280ms cubic-bezier(0.34, 1.2, 0.64, 1) 60ms;
 }
 
 .close-button {
