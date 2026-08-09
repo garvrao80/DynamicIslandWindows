@@ -119,12 +119,10 @@ input {
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.35),
     0 0 16px rgba(78, 227, 177, 0.18);
-  -webkit-app-region: no-drag;
 }
 
 .meta {
   min-width: 0;
-  -webkit-app-region: no-drag;
 }
 
 .track,
