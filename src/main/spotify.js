@@ -185,7 +185,9 @@ async function getCurrentPlayback(config) {
   try {
     data = await spotifyRequest(config, "/me/player/currently-playing");
   } catch (error) {
-    if (error.code === "SPOTIFY_RATE_LIMITED") throw error;
+    if (error.code === "SPOTIFY_RATE_LIMITED" || error.code === "SPOTIFY_QUOTA_EXCEEDED") {
+      throw error;
+    }
     firstError = error;
     data = await spotifyRequest(config, "/me/player");
   }

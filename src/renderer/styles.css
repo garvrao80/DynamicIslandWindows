@@ -52,7 +52,9 @@ input {
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     inset 0 -1px 0 rgba(0, 0, 0, 0.3);
   -webkit-app-region: drag;
+  flex: 0 0 auto;
   will-change: width, height, border-radius;
+  zoom: 0.9;
   transition:
     width 360ms cubic-bezier(0.34, 1.2, 0.64, 1),
     height 360ms cubic-bezier(0.34, 1.2, 0.64, 1),
@@ -69,6 +71,7 @@ input {
 .island.expanded-mode {
   width: 700px;
   height: 326px;
+  zoom: 0.86;
   border-radius: 32px;
 }
 
@@ -92,6 +95,10 @@ input {
   transition:
     opacity 240ms ease 100ms,
     transform 240ms cubic-bezier(0.34, 1.2, 0.64, 1) 100ms;
+  -webkit-app-region: drag;
+}
+
+.compact .controls {
   -webkit-app-region: no-drag;
 }
 
@@ -150,18 +157,11 @@ input {
   font-size: 11.5px;
 }
 
-/* Long Spotify error messages should not be silently truncated;
-   scroll them across the pill so the full text is readable. */
+/* Keep compact-pill text stationary; it should update in place. */
 .lyric.lyric-scroll {
   white-space: nowrap;
   overflow: hidden;
-  animation: lyric-marquee 9s linear infinite;
-}
-
-@keyframes lyric-marquee {
-  0% { transform: translateX(0); }
-  80% { transform: translateX(calc(-100% + 150px)); }
-  100% { transform: translateX(calc(-100% + 150px)); }
+  text-overflow: ellipsis;
 }
 
 .lyric.lyric-truncate {
@@ -176,6 +176,10 @@ input {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.compact .controls {
+  gap: 4px;
 }
 
 button {
@@ -204,6 +208,8 @@ button:active {
   place-items: center;
   width: 36px;
   height: 36px;
+  flex: 0 0 36px;
+  aspect-ratio: 1;
   border-radius: 50%;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -212,6 +218,7 @@ button:active {
 .icon-button.primary {
   width: 42px;
   height: 42px;
+  flex-basis: 42px;
   color: #0b0c0e;
   background: var(--ink);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
@@ -450,13 +457,15 @@ button:active {
 
 .settings-popover {
   position: absolute;
-  left: 26px;
+  left: 22px;
+  right: 22px;
   bottom: 24px;
   z-index: 4;
   display: grid;
   gap: 9px;
   align-content: start;
-  width: 304px;
+  width: auto;
+  max-width: calc(100% - 44px);
   padding: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 24px;
@@ -501,6 +510,22 @@ input {
   gap: 8px;
 }
 
+.compact .icon-button {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+}
+
+.compact .icon-button.primary {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+}
+
+.settings-row {
+  min-width: 0;
+}
+
 .toggle,
 .offset,
 .opacity-slider {
@@ -522,7 +547,8 @@ input {
 }
 
 .opacity-slider input {
-  width: 80px;
+  width: 110px;
+  flex: 1 1 110px;
   height: 4px;
   padding: 0;
   cursor: pointer;

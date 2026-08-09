@@ -23,6 +23,7 @@ let boundsAnimation;
 let lastTrackKey = "";
 let lastPlaybackRefreshAt = 0;
 let rateLimitUntil = 0;
+let rateLimitKind = "";
 let currentLyrics = { synced: [], plain: "", source: "none" };
 let state = {
   status: "Starting",
@@ -65,7 +66,19 @@ function publicConfig() {
     pollIntervalMs: config.pollIntervalMs,
     startAtLogin: config.startAtLogin,
     position: config.position,
-    demoMode: config.demoMode
+    demoMode: config.demoMode,
+    opacity: config.opacity ?? 100
+  };
+}
+
+function clearPlaybackState() {
+  lastTrackKey = "";
+  lastPlaybackRefreshAt = 0;
+  currentLyrics = { synced: [], plain: "", source: "none" };
+  return {
+    playback: null,
+    lyrics: currentLyrics,
+    activeLyricIndex: -1
   };
 }
 
@@ -82,7 +95,7 @@ function createIcon() {
 function targetBounds(expanded = false) {
   const display = screen.getPrimaryDisplay();
   const { x, y, width } = display.workArea;
-  const size = expanded ? { width: 700, height: 326 } : { width: 340, height: 68 };
+  const size = expanded ? { width: 604, height: 282 } : { width: 308, height: 63 };
   const top = y + 18;
   const left = x + Math.round((width - size.width) / 2);
 
@@ -97,8 +110,8 @@ function setWindowBounds(expanded = false) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 340,
-    height: 68,
+    width: 308,
+    height: 63,
     frame: false,
     transparent: true,
     resizable: false,
@@ -188,11 +201,11 @@ function publishState(patch = {}) {
 
 async function refreshPlayback() {
   try {
-    if (config.demoMode || !config.accessToken) {
+    if (config.demoMode) {
       demoPlayback.progressMs = (demoPlayback.progressMs + config.pollIntervalMs) % 30000;
       currentLyrics = demoLyrics;
       publishState({
-        status: config.demoMode ? "Demo mode" : "Add Spotify Client ID to connect",
+        status: "Demo mode",
         playback: { ...demoPlayback },
         lyrics: currentLyrics,
         activeLyricIndex: activeLyricIndex(demoPlayback, currentLyrics)
@@ -200,10 +213,19 @@ async function refreshPlayback() {
       return;
     }
 
-    if (Date.now() < rateLimitUntil) {
-      const playback = estimatedPlayback();
+    if (!config.accessToken) {
       publishState({
-        status: playback ? "Spotify connected" : "Spotify cooling down",
+        status: "Connect Spotify to begin",
+        ...clearPlaybackState()
+      });
+      return;
+    }
+
+    if (Date.now() < rateLimitUntil) {
+      const playback = state.playback?.uri?.startsWith("demo:") ? null : estimatedPlayback();
+      const status = rateLimitKind === "quota" ? "Spotify API quota exceeded" : "Spotify cooling down";
+      publishState({
+        status,
         playback,
         lyrics: currentLyrics,
         activeLyricIndex: activeLyricIndex(playback, currentLyrics)
@@ -218,11 +240,27 @@ async function refreshPlayback() {
     const playback = await getCurrentPlayback(config);
     lastPlaybackRefreshAt = Date.now();
     rateLimitUntil = 0;
+    rateLimitKind = "";
     const trackKey = playback.empty ? "" : playback.uri;
 
     if (trackKey && trackKey !== lastTrackKey) {
       lastTrackKey = trackKey;
-      currentLyrics = await fetchLyrics(playback);
+      currentLyrics = { synced: [], plain: "", source: "loading" };
+      publishState({
+        status: "Loading lyrics",
+        playback,
+        lyrics: currentLyrics,
+        activeLyricIndex: -1
+      });
+
+      try {
+        currentLyrics = await fetchLyrics(playback);
+      } catch {
+        currentLyrics = { synced: [], plain: "", source: "none" };
+      }
+    } else if (playback.empty) {
+      lastTrackKey = "";
+      currentLyrics = { synced: [], plain: "", source: "none" };
     }
 
     publishState({
@@ -251,13 +289,21 @@ async function refreshPlayback() {
     if (error.code === "SPOTIFY_QUOTA_EXCEEDED") {
       const waitMs = Math.max(error.retryAfterMs || 30000, config.pollIntervalMs);
       rateLimitUntil = Date.now() + waitMs + 1000;
-      publishState({ status: "Spotify API quota exceeded" });
+      rateLimitKind = "quota";
+      const playback = state.playback?.uri?.startsWith("demo:") ? null : estimatedPlayback();
+      publishState({
+        status: "Spotify API quota exceeded",
+        playback,
+        lyrics: currentLyrics,
+        activeLyricIndex: activeLyricIndex(playback, currentLyrics)
+      });
       return;
     }
 
     if (error.code === "SPOTIFY_RATE_LIMITED") {
       const waitMs = Math.max(error.retryAfterMs || 30000, config.pollIntervalMs);
       rateLimitUntil = Date.now() + waitMs + 1000;
+      rateLimitKind = "rate";
       const playback = estimatedPlayback();
       publishState({
         status: playback ? "Spotify connected" : "Spotify cooling down",
@@ -308,7 +354,17 @@ app.on("before-quit", () => {
 ipcMain.handle("state:get", () => state);
 
 ipcMain.handle("config:save", (_event, nextConfig) => {
+  const leavingDemo = config.demoMode && nextConfig.demoMode === false;
+  const enteringDemo = !config.demoMode && nextConfig.demoMode === true;
   config = writeConfig({ ...config, ...nextConfig });
+  if (leavingDemo || enteringDemo) {
+    rateLimitUntil = 0;
+    rateLimitKind = "";
+    publishState({
+      status: enteringDemo ? "Demo mode" : "Connecting to Spotify",
+      ...(leavingDemo ? clearPlaybackState() : {})
+    });
+  }
   app.setLoginItemSettings({ openAtLogin: Boolean(config.startAtLogin) });
   startLoop();
   publishState({ status: "Settings saved" });
@@ -316,6 +372,9 @@ ipcMain.handle("config:save", (_event, nextConfig) => {
 });
 
 ipcMain.handle("spotify:connect", async () => {
+  rateLimitUntil = 0;
+  rateLimitKind = "";
+  clearPlaybackState();
   const token = await startSpotifyLogin(config.spotifyClientId);
   config = writeConfig({ ...config, ...token, demoMode: false });
   publishState({ status: "Spotify connected" });
