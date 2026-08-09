@@ -151,14 +151,35 @@ async function spotifyRequest(config, path, options = {}) {
 
   if (response.status === 204) return null;
   if (response.status === 401) throw new Error("spotify-token-expired");
+  if (response.status === 429) {
+    const retryAfter = Number(response.headers.get("Retry-After")) || 1;
+    const error = new Error(`Spotify rate limited (retry in ${retryAfter}s)`);
+    error.code = "SPOTIFY_RATE_LIMITED";
+    error.retryAfterMs = retryAfter * 1000;
+    throw error;
+  }
   if (!response.ok) throw new Error(`Spotify request failed: ${response.status}`);
 
   return response.json();
 }
 
 async function getCurrentPlayback(config) {
-  const data = await spotifyRequest(config, "/me/player/currently-playing");
+  // The currently-playing endpoint returns 204 when nothing is active and the
+  // full track body when something is playing. The /me/player endpoint is the
+  // same data but additionally tells us whether a device is active, which is
+  // important because a Premium Spotify account with no active device returns
+  // 404 from this endpoint even though the user is technically logged in.
+  let firstError;
+  let data;
+  try {
+    data = await spotifyRequest(config, "/me/player/currently-playing");
+  } catch (error) {
+    if (error.code === "SPOTIFY_RATE_LIMITED") throw error;
+    firstError = error;
+    data = await spotifyRequest(config, "/me/player");
+  }
   if (!data?.item) {
+    if (firstError) throw firstError;
     return { isPlaying: false, empty: true };
   }
 

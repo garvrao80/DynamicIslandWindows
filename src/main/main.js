@@ -16,6 +16,8 @@ let config;
 let timer;
 let boundsAnimation;
 let lastTrackKey = "";
+let lastPlaybackRefreshAt = 0;
+let rateLimitUntil = 0;
 let currentLyrics = { synced: [], plain: "", source: "none" };
 let state = {
   status: "Starting",
@@ -148,6 +150,23 @@ function activeLyricIndex(playback, lyrics) {
   return index;
 }
 
+function estimatedPlayback(playback = state.playback) {
+  if (!playback || playback.empty) return playback;
+
+  const progressMs = playback.progressMs || 0;
+  const durationMs = playback.durationMs || 0;
+
+  if (!playback.isPlaying || !durationMs || !lastPlaybackRefreshAt) {
+    return playback;
+  }
+
+  const elapsedMs = Date.now() - lastPlaybackRefreshAt;
+  return {
+    ...playback,
+    progressMs: Math.min(durationMs, progressMs + elapsedMs)
+  };
+}
+
 function publishState(patch = {}) {
   state = {
     ...state,
@@ -176,11 +195,24 @@ async function refreshPlayback() {
       return;
     }
 
+    if (Date.now() < rateLimitUntil) {
+      const playback = estimatedPlayback();
+      publishState({
+        status: playback ? "Spotify connected" : "Spotify cooling down",
+        playback,
+        lyrics: currentLyrics,
+        activeLyricIndex: activeLyricIndex(playback, currentLyrics)
+      });
+      return;
+    }
+
     if (Date.now() > config.tokenExpiresAt - 60_000) {
       config = writeConfig(await refreshAccessToken(config));
     }
 
     const playback = await getCurrentPlayback(config);
+    lastPlaybackRefreshAt = Date.now();
+    rateLimitUntil = 0;
     const trackKey = playback.empty ? "" : playback.uri;
 
     if (trackKey && trackKey !== lastTrackKey) {
@@ -196,9 +228,34 @@ async function refreshPlayback() {
     });
   } catch (error) {
     if (error.message === "spotify-token-expired") {
-      config = writeConfig(await refreshAccessToken(config));
+      try {
+        config = writeConfig(await refreshAccessToken(config));
+      } catch (refreshError) {
+        publishState({ status: `Reconnect Spotify (${refreshError.message})` });
+        return;
+      }
+      return refreshPlayback();
+    }
+
+    // 404 on the player endpoint means no active device, not a real failure.
+    if (error.message === "Spotify request failed: 404") {
+      publishState({ status: "Open Spotify on a device" });
       return;
     }
+
+    if (error.code === "SPOTIFY_RATE_LIMITED") {
+      const waitMs = Math.max(error.retryAfterMs || 30000, config.pollIntervalMs);
+      rateLimitUntil = Date.now() + waitMs + 1000;
+      const playback = estimatedPlayback();
+      publishState({
+        status: playback ? "Spotify connected" : "Spotify cooling down",
+        playback,
+        lyrics: currentLyrics,
+        activeLyricIndex: activeLyricIndex(playback, currentLyrics)
+      });
+      return;
+    }
+
 
     publishState({ status: error.message || "Playback refresh failed" });
   }

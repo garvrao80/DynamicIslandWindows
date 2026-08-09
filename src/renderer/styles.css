@@ -150,6 +150,26 @@ input {
   font-size: 11.5px;
 }
 
+/* Long Spotify error messages should not be silently truncated;
+   scroll them across the pill so the full text is readable. */
+.lyric.lyric-scroll {
+  white-space: nowrap;
+  overflow: hidden;
+  animation: lyric-marquee 9s linear infinite;
+}
+
+@keyframes lyric-marquee {
+  0% { transform: translateX(0); }
+  80% { transform: translateX(calc(-100% + 150px)); }
+  100% { transform: translateX(calc(-100% + 150px)); }
+}
+
+.lyric.lyric-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .controls,
 .expanded-controls {
   display: flex;

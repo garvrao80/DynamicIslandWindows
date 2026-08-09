@@ -8,7 +8,7 @@ const defaultConfig = {
   refreshToken: "",
   tokenExpiresAt: 0,
   lyricOffsetMs: 0,
-  pollIntervalMs: 1500,
+  pollIntervalMs: 5000,
   startAtLogin: false,
   position: "top-center",
   demoMode: true

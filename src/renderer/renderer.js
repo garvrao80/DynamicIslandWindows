@@ -128,7 +128,10 @@ function currentLyric(state) {
 
   if (index >= 0 && lines[index]) return lines[index].text;
   if (state.lyrics?.plain) return state.lyrics.plain.split(/\r?\n/)[0];
-  return state.status || "Ready";
+  // Surface the real status when no lyrics so the pill does not
+  // show a misleading 'Nothing playing'.
+  if (state.status && state.status !== "Spotify connected") return state.status;
+  return "Ready";
 }
 
 function renderLyrics(state) {
@@ -178,7 +181,13 @@ function render(state) {
   const artist = playback.artist || "Windows floating lyrics";
 
   track.textContent = title;
-  lyric.textContent = currentLyric(state);
+  const lyricText = currentLyric(state);
+  lyric.textContent = lyricText;
+  lyric.title = lyricText;
+  lyric.classList.remove("lyric-scroll", "lyric-truncate");
+  // Long status strings (Spotify error codes) need to scroll; short text stays static.
+  if (lyricText.length > 28) lyric.classList.add("lyric-scroll");
+  else lyric.classList.add("lyric-truncate");
   expandedTrack.textContent = title;
   expandedArtist.textContent = artist;
   statusNode.textContent = `${state.status || "Ready"} - ${state.lyrics?.source || "none"}`;
