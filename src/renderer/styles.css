@@ -95,6 +95,10 @@ input {
   transition:
     opacity 240ms ease 100ms,
     transform 240ms cubic-bezier(0.34, 1.2, 0.64, 1) 100ms;
+  -webkit-app-region: drag;
+}
+
+.compact .controls {
   -webkit-app-region: no-drag;
 }
 
