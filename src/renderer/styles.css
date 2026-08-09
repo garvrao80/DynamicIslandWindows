@@ -35,8 +35,8 @@ input {
 }
 
 .island {
-  width: 340px;
-  height: 68px;
+  width: 320px;
+  height: 62px;
   position: relative;
   overflow: hidden;
   color: var(--ink);
@@ -67,23 +67,23 @@ input {
 }
 
 .island.expanded-mode {
-  width: 700px;
-  height: 326px;
+  width: 660px;
+  height: 306px;
   border-radius: 32px;
 }
 
 .compact {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 120px;
+  grid-template-columns: 48px minmax(0, 1fr) 116px;
   align-items: center;
   gap: 10px;
   position: absolute;
   top: 0;
   left: 50%;
-  margin-left: -170px;
-  width: 340px;
-  height: 68px;
-  padding: 8px 14px;
+  margin-left: -160px;
+  width: 320px;
+  height: 62px;
+  padding: 7px 12px;
   cursor: pointer;
   opacity: 1;
   transform: scale(1);
@@ -244,10 +244,10 @@ button:active {
   position: absolute;
   top: 0;
   left: 50%;
-  margin-left: -350px;
-  width: 700px;
-  height: 326px;
-  padding: 22px;
+  margin-left: -330px;
+  width: 660px;
+  height: 306px;
+  padding: 18px;
   opacity: 0;
   transform: scale(0.96);
   pointer-events: none;
