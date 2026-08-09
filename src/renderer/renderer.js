@@ -261,7 +261,7 @@ function setExpanded(nextExpanded) {
   }
 }
 
-compact.addEventListener("click", (event) => {
+compact.addEventListener("dblclick", (event) => {
   if (event.target.closest("button")) return;
   setExpanded(true);
 });
