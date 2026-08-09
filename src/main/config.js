@@ -21,7 +21,13 @@ function configPath() {
 function readConfig() {
   try {
     const raw = fs.readFileSync(configPath(), "utf8");
-    return { ...defaultConfig, ...JSON.parse(raw) };
+    const config = { ...defaultConfig, ...JSON.parse(raw) };
+    // Migrate older installs that still poll every 1.5 seconds. That cadence
+    // can trigger Spotify's rate limiter even when only one island is open.
+    if (!Number.isFinite(config.pollIntervalMs) || config.pollIntervalMs < 5000) {
+      config.pollIntervalMs = defaultConfig.pollIntervalMs;
+    }
+    return config;
   } catch {
     return { ...defaultConfig };
   }

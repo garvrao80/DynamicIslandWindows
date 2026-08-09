@@ -10,6 +10,11 @@ const {
   seekPlayback
 } = require("./spotify");
 
+const hasAppLock = app.requestSingleInstanceLock();
+if (!hasAppLock) {
+  app.quit();
+}
+
 let mainWindow;
 let tray;
 let config;
@@ -267,7 +272,15 @@ function startLoop() {
   refreshPlayback();
 }
 
+app.on("second-instance", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
+
 app.whenReady().then(() => {
+  if (!hasAppLock) return;
   config = readConfig();
   app.setLoginItemSettings({ openAtLogin: Boolean(config.startAtLogin) });
 

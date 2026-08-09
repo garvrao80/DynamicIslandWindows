@@ -128,10 +128,11 @@ function currentLyric(state) {
 
   if (index >= 0 && lines[index]) return lines[index].text;
   if (state.lyrics?.plain) return state.lyrics.plain.split(/\r?\n/)[0];
-  // Surface the real status when no lyrics so the pill does not
-  // show a misleading 'Nothing playing'.
-  if (state.status && state.status !== "Spotify connected") return state.status;
-  return "Ready";
+  // Keep transport/auth status out of the compact lyric preview. Those
+  // messages belong in the expanded status row and should not replace the
+  // track context while Spotify is recovering from a temporary 429.
+  if (state.playback?.track) return "Waiting for lyrics...";
+  return state.demoMode ? "Demo mode" : "Waiting for Spotify playback";
 }
 
 function renderLyrics(state) {
