@@ -248,6 +248,13 @@ async function refreshPlayback() {
       return;
     }
 
+    if (error.code === "SPOTIFY_QUOTA_EXCEEDED") {
+      const waitMs = Math.max(error.retryAfterMs || 30000, config.pollIntervalMs);
+      rateLimitUntil = Date.now() + waitMs + 1000;
+      publishState({ status: "Spotify API quota exceeded" });
+      return;
+    }
+
     if (error.code === "SPOTIFY_RATE_LIMITED") {
       const waitMs = Math.max(error.retryAfterMs || 30000, config.pollIntervalMs);
       rateLimitUntil = Date.now() + waitMs + 1000;

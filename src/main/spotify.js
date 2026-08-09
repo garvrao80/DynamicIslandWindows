@@ -153,8 +153,19 @@ async function spotifyRequest(config, path, options = {}) {
   if (response.status === 401) throw new Error("spotify-token-expired");
   if (response.status === 429) {
     const retryAfter = Number(response.headers.get("Retry-After")) || 1;
-    const error = new Error(`Spotify rate limited (retry in ${retryAfter}s)`);
-    error.code = "SPOTIFY_RATE_LIMITED";
+    let reason = "";
+    try {
+      const payload = await response.json();
+      reason = payload?.error?.reason || "";
+    } catch {
+      // Some Spotify edge responses have no JSON body.
+    }
+    const error = new Error(
+      reason === "QUOTA_EXCEEDED"
+        ? `Spotify API quota exceeded (retry in ${retryAfter}s)`
+        : `Spotify rate limited (retry in ${retryAfter}s)`
+    );
+    error.code = reason === "QUOTA_EXCEEDED" ? "SPOTIFY_QUOTA_EXCEEDED" : "SPOTIFY_RATE_LIMITED";
     error.retryAfterMs = retryAfter * 1000;
     throw error;
   }
