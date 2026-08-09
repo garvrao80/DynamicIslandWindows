@@ -27,6 +27,7 @@ let expanded = false;
 let currentState = null;
 let expandTimer = null;
 let lastLyricsKey = "";
+let playbackSampledAt = 0;
 
 const icons = {
   previous:
@@ -76,14 +77,43 @@ function renderProgress(playback = {}) {
 
 function lyricIndexForProgress(progressMs) {
   const lines = currentState?.lyrics?.synced || [];
+  const adjustedProgress = progressMs + (Number(currentState?.config?.lyricOffsetMs) || 0);
   let index = -1;
 
   for (let i = 0; i < lines.length; i += 1) {
-    if (lines[i].timeMs <= progressMs) index = i;
+    if (lines[i].timeMs <= adjustedProgress) index = i;
     else break;
   }
 
   return index;
+}
+
+function renderCompactLyric(state) {
+  const lyricText = currentLyric(state);
+  lyric.textContent = lyricText;
+  lyric.title = lyricText;
+  lyric.classList.remove("lyric-scroll", "lyric-truncate");
+  if (lyricText.length > 28) lyric.classList.add("lyric-scroll");
+  else lyric.classList.add("lyric-truncate");
+}
+
+function updatePlaybackEstimate() {
+  const playback = currentState?.playback;
+  if (!playback || playback.empty || !playback.isPlaying || !playback.durationMs || !playbackSampledAt) return;
+
+  const progressMs = Math.min(
+    playback.durationMs,
+    (playback.progressMs || 0) + (Date.now() - playbackSampledAt)
+  );
+  const activeLyricIndex = lyricIndexForProgress(progressMs);
+
+  if (activeLyricIndex !== currentState.activeLyricIndex) {
+    currentState.activeLyricIndex = activeLyricIndex;
+    renderCompactLyric(currentState);
+    renderLyrics(currentState);
+  }
+
+  renderProgress({ ...playback, progressMs });
 }
 
 function seekFromPointer(event) {
@@ -95,6 +125,7 @@ function seekFromPointer(event) {
   const positionMs = Math.round(playback.durationMs * percent);
 
   playback.progressMs = positionMs;
+  playbackSampledAt = Date.now();
   currentState.activeLyricIndex = lyricIndexForProgress(positionMs);
   renderProgress(playback);
   renderLyrics(currentState);
@@ -110,6 +141,7 @@ function sendPlayback(action) {
   if (action === "play" || action === "pause") {
     const isPlaying = action === "play";
     if (currentState?.playback) currentState.playback.isPlaying = isPlaying;
+    playbackSampledAt = Date.now();
     updatePlayIcons(isPlaying);
   }
 
@@ -179,18 +211,13 @@ function renderLyrics(state) {
 
 function render(state) {
   currentState = state;
+  playbackSampledAt = Date.now();
   const playback = state.playback || {};
   const title = playback.track || "Lyrics Island";
   const artist = playback.artist || "Windows floating lyrics";
 
   track.textContent = title;
-  const lyricText = currentLyric(state);
-  lyric.textContent = lyricText;
-  lyric.title = lyricText;
-  lyric.classList.remove("lyric-scroll", "lyric-truncate");
-  // Long status strings (Spotify error codes) need to scroll; short text stays static.
-  if (lyricText.length > 28) lyric.classList.add("lyric-scroll");
-  else lyric.classList.add("lyric-truncate");
+  renderCompactLyric(state);
   expandedTrack.textContent = title;
   expandedArtist.textContent = artist;
   statusNode.textContent = `${state.status || "Ready"} - ${state.lyrics?.source || "none"}`;
@@ -293,6 +320,7 @@ connect.addEventListener("click", async () => {
 
 window.lyricsIsland.onState(render);
 window.lyricsIsland.getState().then(render);
+setInterval(updatePlaybackEstimate, 100);
 
 setIcon(document.getElementById("previous"), "previous");
 setIcon(document.getElementById("expandedPrevious"), "previous");

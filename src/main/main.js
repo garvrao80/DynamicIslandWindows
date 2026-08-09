@@ -245,7 +245,22 @@ async function refreshPlayback() {
 
     if (trackKey && trackKey !== lastTrackKey) {
       lastTrackKey = trackKey;
-      currentLyrics = await fetchLyrics(playback);
+      currentLyrics = { synced: [], plain: "", source: "loading" };
+      publishState({
+        status: "Loading lyrics",
+        playback,
+        lyrics: currentLyrics,
+        activeLyricIndex: -1
+      });
+
+      try {
+        currentLyrics = await fetchLyrics(playback);
+      } catch {
+        currentLyrics = { synced: [], plain: "", source: "none" };
+      }
+    } else if (playback.empty) {
+      lastTrackKey = "";
+      currentLyrics = { synced: [], plain: "", source: "none" };
     }
 
     publishState({
