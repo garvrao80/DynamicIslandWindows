@@ -171,6 +171,10 @@ input {
   gap: 8px;
 }
 
+.compact .controls {
+  gap: 4px;
+}
+
 button {
   border: 0;
   color: var(--ink);
@@ -197,6 +201,8 @@ button:active {
   place-items: center;
   width: 36px;
   height: 36px;
+  flex: 0 0 36px;
+  aspect-ratio: 1;
   border-radius: 50%;
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -205,6 +211,7 @@ button:active {
 .icon-button.primary {
   width: 42px;
   height: 42px;
+  flex-basis: 42px;
   color: #0b0c0e;
   background: var(--ink);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
@@ -494,6 +501,18 @@ input {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.compact .icon-button {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+}
+
+.compact .icon-button.primary {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
 }
 
 .settings-row {
