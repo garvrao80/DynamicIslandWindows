@@ -83,6 +83,10 @@ function clearPlaybackState() {
 }
 
 function createIcon() {
+  const iconPath = path.join(__dirname, "../../assets/lyrics-island.png");
+  const icon = nativeImage.createFromPath(iconPath);
+  if (!icon.isEmpty()) return icon;
+
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
       <rect width="64" height="64" rx="18" fill="#101113"/>
@@ -120,6 +124,7 @@ function createWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
+    icon: path.join(__dirname, "../../assets/lyrics-island.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -286,6 +291,14 @@ async function refreshPlayback() {
       return;
     }
 
+    if (error.code === "SPOTIFY_FORBIDDEN") {
+      publishState({
+        status: "Spotify Premium required",
+        ...clearPlaybackState()
+      });
+      return;
+    }
+
     if (error.code === "SPOTIFY_QUOTA_EXCEEDED") {
       const waitMs = Math.max(error.retryAfterMs || 30000, config.pollIntervalMs);
       rateLimitUntil = Date.now() + waitMs + 1000;
@@ -403,8 +416,16 @@ ipcMain.handle("spotify:control", async (_event, action) => {
     });
   }
 
-  await controlPlayback(config, action);
-  await refreshPlayback();
+  try {
+    await controlPlayback(config, action);
+    await refreshPlayback();
+  } catch (error) {
+    if (error.code === "SPOTIFY_FORBIDDEN") {
+      publishState({ status: "Spotify Premium required" });
+      return state;
+    }
+    throw error;
+  }
   return state;
 });
 

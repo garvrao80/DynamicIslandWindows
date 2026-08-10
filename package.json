@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "pack": "electron-packager . \"Lyrics Island\" --platform=win32 --arch=x64 --out=release --overwrite --ignore=release --ignore=.git",
+    "pack": "electron-packager . \"Lyrics Island\" --platform=win32 --arch=x64 --icon=assets/lyrics-island.ico --out=release --overwrite --ignore=release --ignore=.git",
     "dist": "electron-builder --win nsis portable"
   },
   "keywords": [
@@ -35,6 +35,7 @@
       "package.json"
     ],
     "win": {
+      "icon": "assets/lyrics-island.ico",
       "target": [
         "nsis",
         "portable"

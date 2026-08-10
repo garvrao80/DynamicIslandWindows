@@ -169,27 +169,46 @@ async function spotifyRequest(config, path, options = {}) {
     error.retryAfterMs = retryAfter * 1000;
     throw error;
   }
-  if (!response.ok) throw new Error(`Spotify request failed: ${response.status}`);
+  if (!response.ok) {
+    let detail = "";
+    try {
+      detail = (await response.text()).trim();
+    } catch {
+      // Some Spotify edge responses have no readable body.
+    }
+
+    if (response.status === 403) {
+      const error = new Error(
+        detail || "Spotify playback access denied. An active Premium subscription is required."
+      );
+      error.code = "SPOTIFY_FORBIDDEN";
+      throw error;
+    }
+
+    throw new Error(`Spotify request failed: ${response.status}${detail ? ` - ${detail}` : ""}`);
+  }
 
   return response.json();
 }
 
 async function getCurrentPlayback(config) {
-  // The currently-playing endpoint returns 204 when nothing is active and the
-  // full track body when something is playing. The /me/player endpoint is the
-  // same data but additionally tells us whether a device is active, which is
-  // important because a Premium Spotify account with no active device returns
-  // 404 from this endpoint even though the user is technically logged in.
+  // /me/player is the reliable source for an active desktop device and returns
+  // the current track even when playback is paused. Use currently-playing as a
+  // fallback for older/quirky Spotify device responses.
   let firstError;
   let data;
   try {
-    data = await spotifyRequest(config, "/me/player/currently-playing");
+    data = await spotifyRequest(config, "/me/player");
   } catch (error) {
-    if (error.code === "SPOTIFY_RATE_LIMITED" || error.code === "SPOTIFY_QUOTA_EXCEEDED") {
+    if (
+      error.code === "SPOTIFY_RATE_LIMITED" ||
+      error.code === "SPOTIFY_QUOTA_EXCEEDED" ||
+      error.code === "SPOTIFY_FORBIDDEN"
+    ) {
       throw error;
     }
     firstError = error;
-    data = await spotifyRequest(config, "/me/player");
+    data = await spotifyRequest(config, "/me/player/currently-playing");
   }
   if (!data?.item) {
     if (firstError) throw firstError;
