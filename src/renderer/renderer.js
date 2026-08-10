@@ -164,6 +164,7 @@ function currentLyric(state) {
   // messages belong in the expanded status row and should not replace the
   // track context while Spotify is recovering from a temporary 429.
   if (state.status?.startsWith("Spotify API quota exceeded")) return "Spotify API limit reached";
+  if (state.status === "Spotify Premium required") return "Spotify Premium required";
   if (state.status === "Spotify cooling down") return "Spotify API cooldown";
   if (state.playback?.track) return "Waiting for lyrics...";
   return state.demoMode ? "Demo mode" : "Waiting for Spotify playback";

@@ -169,7 +169,24 @@ async function spotifyRequest(config, path, options = {}) {
     error.retryAfterMs = retryAfter * 1000;
     throw error;
   }
-  if (!response.ok) throw new Error(`Spotify request failed: ${response.status}`);
+  if (!response.ok) {
+    let detail = "";
+    try {
+      detail = (await response.text()).trim();
+    } catch {
+      // Some Spotify edge responses have no readable body.
+    }
+
+    if (response.status === 403) {
+      const error = new Error(
+        detail || "Spotify playback access denied. An active Premium subscription is required."
+      );
+      error.code = "SPOTIFY_FORBIDDEN";
+      throw error;
+    }
+
+    throw new Error(`Spotify request failed: ${response.status}${detail ? ` - ${detail}` : ""}`);
+  }
 
   return response.json();
 }
@@ -183,7 +200,11 @@ async function getCurrentPlayback(config) {
   try {
     data = await spotifyRequest(config, "/me/player");
   } catch (error) {
-    if (error.code === "SPOTIFY_RATE_LIMITED" || error.code === "SPOTIFY_QUOTA_EXCEEDED") {
+    if (
+      error.code === "SPOTIFY_RATE_LIMITED" ||
+      error.code === "SPOTIFY_QUOTA_EXCEEDED" ||
+      error.code === "SPOTIFY_FORBIDDEN"
+    ) {
       throw error;
     }
     firstError = error;

@@ -286,6 +286,14 @@ async function refreshPlayback() {
       return;
     }
 
+    if (error.code === "SPOTIFY_FORBIDDEN") {
+      publishState({
+        status: "Spotify Premium required",
+        ...clearPlaybackState()
+      });
+      return;
+    }
+
     if (error.code === "SPOTIFY_QUOTA_EXCEEDED") {
       const waitMs = Math.max(error.retryAfterMs || 30000, config.pollIntervalMs);
       rateLimitUntil = Date.now() + waitMs + 1000;
@@ -403,8 +411,16 @@ ipcMain.handle("spotify:control", async (_event, action) => {
     });
   }
 
-  await controlPlayback(config, action);
-  await refreshPlayback();
+  try {
+    await controlPlayback(config, action);
+    await refreshPlayback();
+  } catch (error) {
+    if (error.code === "SPOTIFY_FORBIDDEN") {
+      publishState({ status: "Spotify Premium required" });
+      return state;
+    }
+    throw error;
+  }
   return state;
 });
 
