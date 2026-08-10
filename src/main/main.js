@@ -83,6 +83,10 @@ function clearPlaybackState() {
 }
 
 function createIcon() {
+  const iconPath = path.join(__dirname, "../../assets/lyrics-island.png");
+  const icon = nativeImage.createFromPath(iconPath);
+  if (!icon.isEmpty()) return icon;
+
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
       <rect width="64" height="64" rx="18" fill="#101113"/>
@@ -120,6 +124,7 @@ function createWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
+    icon: path.join(__dirname, "../../assets/lyrics-island.ico"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
