@@ -141,19 +141,25 @@ function createIcon() {
   return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`);
 }
 
-function targetBounds(expanded = false) {
-  const display = screen.getPrimaryDisplay();
-  const { x, y, width } = display.workArea;
-  const size = expanded ? { width: 604, height: 282 } : { width: 308, height: 63 };
-  const top = y + 18;
-  const left = x + Math.round((width - size.width) / 2);
-
-  return { x: left, y: top, ...size };
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
-function setWindowBounds(expanded = false) {
+function targetBounds(expanded = false, anchorBounds = null) {
+  const display = anchorBounds ? screen.getDisplayMatching(anchorBounds) : screen.getPrimaryDisplay();
+  const { x, y, width, height } = display.workArea;
+  const size = expanded ? { width: 604, height: 282 } : { width: 308, height: 63 };
+  const centerX = anchorBounds ? anchorBounds.x + anchorBounds.width / 2 : x + width / 2;
+  const top = anchorBounds ? anchorBounds.y : y + 18;
+  const left = Math.round(clamp(centerX - size.width / 2, x, x + width - size.width));
+  const clampedTop = Math.round(clamp(top, y, y + height - size.height));
+
+  return { x: left, y: clampedTop, ...size };
+}
+
+function setWindowBounds(expanded = false, preservePosition = true) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const target = targetBounds(expanded);
+  const target = targetBounds(expanded, preservePosition ? mainWindow.getBounds() : null);
   mainWindow.setBounds(target, false);
 }
 
@@ -179,7 +185,7 @@ function createWindow() {
 
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
-  setWindowBounds(false);
+  setWindowBounds(false, false);
   mainWindow.once("ready-to-show", () => mainWindow.show());
 }
 
