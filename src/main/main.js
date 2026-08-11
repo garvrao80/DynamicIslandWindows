@@ -25,6 +25,8 @@ let lastPlaybackRefreshAt = 0;
 let rateLimitUntil = 0;
 let rateLimitKind = "";
 let currentLyrics = { synced: [], plain: "", source: "none" };
+const lyricsCache = new Map();
+const lyricsCacheLimit = 50;
 let state = {
   status: "Starting",
   connected: false,
@@ -58,6 +60,47 @@ const demoLyrics = {
     { timeMs: 24000, text: "Connect Spotify when you're ready" }
   ]
 };
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function lyricsCacheKey(playback) {
+  if (!playback || playback.empty) return "";
+  return [
+    playback.uri,
+    playback.track,
+    playback.artist,
+    playback.album,
+    playback.durationMs
+  ].filter(Boolean).join("|");
+}
+
+async function lyricsForPlayback(playback) {
+  const cacheKey = lyricsCacheKey(playback);
+  if (cacheKey && lyricsCache.has(cacheKey)) {
+    const cachedLyrics = lyricsCache.get(cacheKey);
+    lyricsCache.delete(cacheKey);
+    lyricsCache.set(cacheKey, cachedLyrics);
+    return cachedLyrics;
+  }
+
+  let lyrics;
+  try {
+    lyrics = await fetchLyrics(playback);
+  } catch {
+    lyrics = { synced: [], plain: "", source: "none" };
+  }
+
+  if (cacheKey) {
+    lyricsCache.set(cacheKey, lyrics);
+    if (lyricsCache.size > lyricsCacheLimit) {
+      lyricsCache.delete(lyricsCache.keys().next().value);
+    }
+  }
+
+  return lyrics;
+}
 
 function publicConfig() {
   return {
@@ -204,7 +247,7 @@ function publishState(patch = {}) {
   }
 }
 
-async function refreshPlayback() {
+async function refreshPlayback(options = {}) {
   try {
     if (config.demoMode) {
       demoPlayback.progressMs = (demoPlayback.progressMs + config.pollIntervalMs) % 30000;
@@ -248,6 +291,10 @@ async function refreshPlayback() {
     rateLimitKind = "";
     const trackKey = playback.empty ? "" : playback.uri;
 
+    if (options.waitForTrackChangeFrom && trackKey === options.waitForTrackChangeFrom) {
+      return playback;
+    }
+
     if (trackKey && trackKey !== lastTrackKey) {
       lastTrackKey = trackKey;
       currentLyrics = { synced: [], plain: "", source: "loading" };
@@ -258,11 +305,7 @@ async function refreshPlayback() {
         activeLyricIndex: -1
       });
 
-      try {
-        currentLyrics = await fetchLyrics(playback);
-      } catch {
-        currentLyrics = { synced: [], plain: "", source: "none" };
-      }
+      currentLyrics = await lyricsForPlayback(playback);
     } else if (playback.empty) {
       lastTrackKey = "";
       currentLyrics = { synced: [], plain: "", source: "none" };
@@ -336,6 +379,27 @@ function startLoop() {
   clearInterval(timer);
   timer = setInterval(refreshPlayback, config.pollIntervalMs);
   refreshPlayback();
+}
+
+async function refreshAfterTrackSkip(previousTrackKey) {
+  const retryDelays = [80, 140, 220, 340, 520, 760];
+
+  publishState({ status: "Skipping track" });
+
+  for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
+    const playback = await refreshPlayback({ waitForTrackChangeFrom: previousTrackKey });
+    const trackKey = playback?.empty ? "" : playback?.uri;
+
+    if (!previousTrackKey || (trackKey && trackKey !== previousTrackKey)) {
+      return playback;
+    }
+
+    if (attempt < retryDelays.length) {
+      await sleep(retryDelays[attempt]);
+    }
+  }
+
+  return refreshPlayback();
 }
 
 app.on("second-instance", () => {
@@ -417,8 +481,13 @@ ipcMain.handle("spotify:control", async (_event, action) => {
   }
 
   try {
+    const previousTrackKey = state.playback?.empty ? "" : state.playback?.uri || "";
     await controlPlayback(config, action);
-    await refreshPlayback();
+    if (action === "next" || action === "previous") {
+      await refreshAfterTrackSkip(previousTrackKey);
+    } else {
+      await refreshPlayback();
+    }
   } catch (error) {
     if (error.code === "SPOTIFY_FORBIDDEN") {
       publishState({ status: "Spotify Premium required" });
