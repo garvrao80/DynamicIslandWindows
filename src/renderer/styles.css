@@ -429,8 +429,10 @@ button:active {
 .lyric-line {
   padding: 6px 16px;
   color: rgba(247, 248, 251, 0.3);
+  font-family: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
   font-size: 17px;
   font-weight: 550;
+  letter-spacing: -0.15px;
   line-height: 1.4;
   text-align: center;
   opacity: 0.56;
