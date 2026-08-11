@@ -57,6 +57,10 @@ function applyArtwork(node, artworkUrl) {
   node.style.backgroundImage = artworkUrl ? `url("${artworkUrl}")` : "";
 }
 
+function applyArtworkGlow(artworkUrl) {
+  island.style.setProperty("--artwork-url", artworkUrl ? `url("${artworkUrl}")` : "none");
+}
+
 function formatTime(ms = 0) {
   const safeMs = Math.max(0, Number(ms) || 0);
   const totalSeconds = Math.floor(safeMs / 1000);
@@ -226,6 +230,7 @@ function render(state) {
 
   applyArtwork(art, playback.artworkUrl);
   applyArtwork(expandedArt, playback.artworkUrl);
+  applyArtworkGlow(playback.artworkUrl);
 
   if (document.activeElement !== clientId) clientId.value = state.config?.spotifyClientId || "";
   if (document.activeElement !== demoMode) demoMode.checked = Boolean(state.config?.demoMode);
