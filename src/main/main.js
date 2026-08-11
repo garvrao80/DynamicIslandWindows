@@ -61,6 +61,8 @@ const demoLyrics = {
   ]
 };
 
+const restartPreviousThresholdMs = 3000;
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -461,6 +463,16 @@ ipcMain.handle("spotify:connect", async () => {
 
 ipcMain.handle("spotify:control", async (_event, action) => {
   if (config.demoMode) {
+    if (action === "previous" && demoPlayback.progressMs > restartPreviousThresholdMs) {
+      demoPlayback.progressMs = 0;
+      publishState({
+        status: "Restarted track",
+        playback: { ...demoPlayback },
+        lyrics: currentLyrics,
+        activeLyricIndex: activeLyricIndex(demoPlayback, currentLyrics)
+      });
+    }
+
     if (action === "play" || action === "pause") {
       demoPlayback.isPlaying = action === "play";
       publishState({
@@ -469,6 +481,29 @@ ipcMain.handle("spotify:control", async (_event, action) => {
         lyrics: currentLyrics,
         activeLyricIndex: activeLyricIndex(demoPlayback, currentLyrics)
       });
+    }
+    return state;
+  }
+
+  const playback = estimatedPlayback();
+  if (action === "previous" && playback?.progressMs > restartPreviousThresholdMs) {
+    const restartedPlayback = { ...playback, progressMs: 0 };
+    publishState({
+      status: "Restarted track",
+      playback: restartedPlayback,
+      lyrics: currentLyrics,
+      activeLyricIndex: activeLyricIndex(restartedPlayback, currentLyrics)
+    });
+
+    try {
+      await seekPlayback(config, 0);
+      await refreshPlayback();
+    } catch (error) {
+      if (error.code === "SPOTIFY_FORBIDDEN") {
+        publishState({ status: "Spotify Premium required" });
+        return state;
+      }
+      throw error;
     }
     return state;
   }
