@@ -25,6 +25,8 @@ let lastPlaybackRefreshAt = 0;
 let rateLimitUntil = 0;
 let rateLimitKind = "";
 let currentLyrics = { synced: [], plain: "", source: "none" };
+const lyricsCache = new Map();
+const lyricsCacheLimit = 50;
 let state = {
   status: "Starting",
   connected: false,
@@ -58,6 +60,49 @@ const demoLyrics = {
     { timeMs: 24000, text: "Connect Spotify when you're ready" }
   ]
 };
+
+const restartPreviousThresholdMs = 3000;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function lyricsCacheKey(playback) {
+  if (!playback || playback.empty) return "";
+  return [
+    playback.uri,
+    playback.track,
+    playback.artist,
+    playback.album,
+    playback.durationMs
+  ].filter(Boolean).join("|");
+}
+
+async function lyricsForPlayback(playback) {
+  const cacheKey = lyricsCacheKey(playback);
+  if (cacheKey && lyricsCache.has(cacheKey)) {
+    const cachedLyrics = lyricsCache.get(cacheKey);
+    lyricsCache.delete(cacheKey);
+    lyricsCache.set(cacheKey, cachedLyrics);
+    return cachedLyrics;
+  }
+
+  let lyrics;
+  try {
+    lyrics = await fetchLyrics(playback);
+  } catch {
+    lyrics = { synced: [], plain: "", source: "none" };
+  }
+
+  if (cacheKey) {
+    lyricsCache.set(cacheKey, lyrics);
+    if (lyricsCache.size > lyricsCacheLimit) {
+      lyricsCache.delete(lyricsCache.keys().next().value);
+    }
+  }
+
+  return lyrics;
+}
 
 function publicConfig() {
   return {
@@ -96,19 +141,25 @@ function createIcon() {
   return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`);
 }
 
-function targetBounds(expanded = false) {
-  const display = screen.getPrimaryDisplay();
-  const { x, y, width } = display.workArea;
-  const size = expanded ? { width: 604, height: 282 } : { width: 308, height: 63 };
-  const top = y + 18;
-  const left = x + Math.round((width - size.width) / 2);
-
-  return { x: left, y: top, ...size };
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
 
-function setWindowBounds(expanded = false) {
+function targetBounds(expanded = false, anchorBounds = null) {
+  const display = anchorBounds ? screen.getDisplayMatching(anchorBounds) : screen.getPrimaryDisplay();
+  const { x, y, width, height } = display.workArea;
+  const size = expanded ? { width: 604, height: 282 } : { width: 308, height: 63 };
+  const centerX = anchorBounds ? anchorBounds.x + anchorBounds.width / 2 : x + width / 2;
+  const top = anchorBounds ? anchorBounds.y : y + 18;
+  const left = Math.round(clamp(centerX - size.width / 2, x, x + width - size.width));
+  const clampedTop = Math.round(clamp(top, y, y + height - size.height));
+
+  return { x: left, y: clampedTop, ...size };
+}
+
+function setWindowBounds(expanded = false, preservePosition = true) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const target = targetBounds(expanded);
+  const target = targetBounds(expanded, preservePosition ? mainWindow.getBounds() : null);
   mainWindow.setBounds(target, false);
 }
 
@@ -118,6 +169,7 @@ function createWindow() {
     height: 63,
     frame: false,
     transparent: true,
+    backgroundColor: "#00000000",
     resizable: false,
     movable: true,
     show: false,
@@ -132,9 +184,10 @@ function createWindow() {
     }
   });
 
+  mainWindow.setBackgroundColor("#00000000");
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
-  setWindowBounds(false);
+  setWindowBounds(false, false);
   mainWindow.once("ready-to-show", () => mainWindow.show());
 }
 
@@ -204,7 +257,7 @@ function publishState(patch = {}) {
   }
 }
 
-async function refreshPlayback() {
+async function refreshPlayback(options = {}) {
   try {
     if (config.demoMode) {
       demoPlayback.progressMs = (demoPlayback.progressMs + config.pollIntervalMs) % 30000;
@@ -248,6 +301,10 @@ async function refreshPlayback() {
     rateLimitKind = "";
     const trackKey = playback.empty ? "" : playback.uri;
 
+    if (options.waitForTrackChangeFrom && trackKey === options.waitForTrackChangeFrom) {
+      return playback;
+    }
+
     if (trackKey && trackKey !== lastTrackKey) {
       lastTrackKey = trackKey;
       currentLyrics = { synced: [], plain: "", source: "loading" };
@@ -258,11 +315,7 @@ async function refreshPlayback() {
         activeLyricIndex: -1
       });
 
-      try {
-        currentLyrics = await fetchLyrics(playback);
-      } catch {
-        currentLyrics = { synced: [], plain: "", source: "none" };
-      }
+      currentLyrics = await lyricsForPlayback(playback);
     } else if (playback.empty) {
       lastTrackKey = "";
       currentLyrics = { synced: [], plain: "", source: "none" };
@@ -338,6 +391,27 @@ function startLoop() {
   refreshPlayback();
 }
 
+async function refreshAfterTrackSkip(previousTrackKey) {
+  const retryDelays = [80, 140, 220, 340, 520, 760];
+
+  publishState({ status: "Skipping track" });
+
+  for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
+    const playback = await refreshPlayback({ waitForTrackChangeFrom: previousTrackKey });
+    const trackKey = playback?.empty ? "" : playback?.uri;
+
+    if (!previousTrackKey || (trackKey && trackKey !== previousTrackKey)) {
+      return playback;
+    }
+
+    if (attempt < retryDelays.length) {
+      await sleep(retryDelays[attempt]);
+    }
+  }
+
+  return refreshPlayback();
+}
+
 app.on("second-instance", () => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.isMinimized()) mainWindow.restore();
@@ -397,6 +471,16 @@ ipcMain.handle("spotify:connect", async () => {
 
 ipcMain.handle("spotify:control", async (_event, action) => {
   if (config.demoMode) {
+    if (action === "previous" && demoPlayback.progressMs > restartPreviousThresholdMs) {
+      demoPlayback.progressMs = 0;
+      publishState({
+        status: "Restarted track",
+        playback: { ...demoPlayback },
+        lyrics: currentLyrics,
+        activeLyricIndex: activeLyricIndex(demoPlayback, currentLyrics)
+      });
+    }
+
     if (action === "play" || action === "pause") {
       demoPlayback.isPlaying = action === "play";
       publishState({
@@ -409,6 +493,29 @@ ipcMain.handle("spotify:control", async (_event, action) => {
     return state;
   }
 
+  const playback = estimatedPlayback();
+  if (action === "previous" && playback?.progressMs > restartPreviousThresholdMs) {
+    const restartedPlayback = { ...playback, progressMs: 0 };
+    publishState({
+      status: "Restarted track",
+      playback: restartedPlayback,
+      lyrics: currentLyrics,
+      activeLyricIndex: activeLyricIndex(restartedPlayback, currentLyrics)
+    });
+
+    try {
+      await seekPlayback(config, 0);
+      await refreshPlayback();
+    } catch (error) {
+      if (error.code === "SPOTIFY_FORBIDDEN") {
+        publishState({ status: "Spotify Premium required" });
+        return state;
+      }
+      throw error;
+    }
+    return state;
+  }
+
   if ((action === "play" || action === "pause") && state.playback) {
     publishState({
       status: action === "play" ? "Playing" : "Paused",
@@ -417,8 +524,13 @@ ipcMain.handle("spotify:control", async (_event, action) => {
   }
 
   try {
+    const previousTrackKey = state.playback?.empty ? "" : state.playback?.uri || "";
     await controlPlayback(config, action);
-    await refreshPlayback();
+    if (action === "next" || action === "previous") {
+      await refreshAfterTrackSkip(previousTrackKey);
+    } else {
+      await refreshPlayback();
+    }
   } catch (error) {
     if (error.code === "SPOTIFY_FORBIDDEN") {
       publishState({ status: "Spotify Premium required" });
