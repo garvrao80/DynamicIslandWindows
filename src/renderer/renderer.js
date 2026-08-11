@@ -28,6 +28,7 @@ let currentState = null;
 let expandTimer = null;
 let lastLyricsKey = "";
 let playbackSampledAt = 0;
+let collapseFallbackTimer = null;
 
 const icons = {
   previous:
@@ -246,6 +247,7 @@ function render(state) {
 
 function setExpanded(nextExpanded) {
   clearTimeout(expandTimer);
+  clearTimeout(collapseFallbackTimer);
   if (expanded === nextExpanded) return;
   expanded = nextExpanded;
 
@@ -257,13 +259,19 @@ function setExpanded(nextExpanded) {
       island.classList.add("expanded-mode");
     }, 20);
   } else {
-    // 1. Remove class so CSS shrinks .island size smoothly
+    const shrinkNativeWindow = () => {
+      clearTimeout(collapseFallbackTimer);
+      island.removeEventListener("transitionend", onCollapseTransitionEnd);
+      window.lyricsIsland.setExpanded(false);
+    };
+    const onCollapseTransitionEnd = (event) => {
+      if (event.target === island && event.propertyName === "width") shrinkNativeWindow();
+    };
+
+    island.addEventListener("transitionend", onCollapseTransitionEnd);
     island.classList.remove("expanded-mode");
     island.classList.remove("settings-open");
-    // 2. Wait for CSS animation (360ms) to finish before shrinking native window
-    expandTimer = setTimeout(() => {
-      window.lyricsIsland.setExpanded(false);
-    }, 380);
+    collapseFallbackTimer = setTimeout(shrinkNativeWindow, 440);
   }
 }
 

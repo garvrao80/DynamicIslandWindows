@@ -169,6 +169,7 @@ function createWindow() {
     height: 63,
     frame: false,
     transparent: true,
+    backgroundColor: "#00000000",
     resizable: false,
     movable: true,
     show: false,
@@ -183,6 +184,7 @@ function createWindow() {
     }
   });
 
+  mainWindow.setBackgroundColor("#00000000");
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   setWindowBounds(false, false);
