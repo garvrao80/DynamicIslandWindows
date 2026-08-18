@@ -64,8 +64,7 @@ input {
 .island.expanded-mode {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.025),
-    0 28px 90px rgba(0, 0, 0, 0.54);
+    inset 0 -1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .island.expanded-mode {
@@ -322,10 +321,10 @@ button:active {
 
 .now-playing {
   display: grid;
-  grid-template-rows: 126px minmax(48px, auto) 40px 18px 14px;
+  grid-template-rows: 126px minmax(42px, auto) 40px 18px 14px;
   align-content: center;
   justify-items: center;
-  gap: 5px;
+  gap: 2px;
   min-width: 0;
   padding-right: 4px;
 }
