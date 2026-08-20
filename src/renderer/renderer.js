@@ -13,6 +13,7 @@ const offset = document.getElementById("offset");
 const opacityInput = document.getElementById("opacity");
 const settings = document.getElementById("settings");
 const settingsToggle = document.getElementById("settingsToggle");
+const resizeHandle = document.getElementById("resizeHandle");
 const connect = document.getElementById("connect");
 const dashboard = document.getElementById("dashboard");
 const play = document.getElementById("play");
@@ -29,6 +30,7 @@ let expandTimer = null;
 let lastLyricsKey = "";
 let playbackSampledAt = 0;
 let collapseFallbackTimer = null;
+let resizeSession = null;
 
 const icons = {
   previous:
@@ -281,6 +283,37 @@ compact.addEventListener("dblclick", (event) => {
 });
 
 document.getElementById("collapse").addEventListener("click", () => setExpanded(false));
+resizeHandle.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  resizeSession = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    startWidth: island.getBoundingClientRect().width,
+    startHeight: island.getBoundingClientRect().height
+  };
+  resizeHandle.setPointerCapture(event.pointerId);
+  resizeHandle.classList.add("resizing");
+});
+
+resizeHandle.addEventListener("pointermove", (event) => {
+  if (!resizeSession || event.pointerId !== resizeSession.pointerId) return;
+  event.preventDefault();
+  window.lyricsIsland.resizeExpanded({
+    width: resizeSession.startWidth + event.clientX - resizeSession.startX,
+    height: resizeSession.startHeight + event.clientY - resizeSession.startY
+  });
+});
+
+function finishResize(event) {
+  if (!resizeSession || event.pointerId !== resizeSession.pointerId) return;
+  resizeSession = null;
+  resizeHandle.classList.remove("resizing");
+}
+
+resizeHandle.addEventListener("pointerup", finishResize);
+resizeHandle.addEventListener("pointercancel", finishResize);
 document.getElementById("previous").addEventListener("click", (event) => handlePlaybackClick(event, "previous"));
 document.getElementById("expandedPrevious").addEventListener("click", (event) => handlePlaybackClick(event, "previous"));
 play.addEventListener("click", (event) => handlePlaybackClick(event, playbackAction()));

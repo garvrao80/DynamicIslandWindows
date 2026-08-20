@@ -62,6 +62,8 @@ const demoLyrics = {
 };
 
 const restartPreviousThresholdMs = 3000;
+const expandedMinSize = { width: 500, height: 246 };
+let expandedSize = { width: 604, height: 282 };
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -148,7 +150,12 @@ function clamp(value, min, max) {
 function targetBounds(expanded = false, anchorBounds = null) {
   const display = anchorBounds ? screen.getDisplayMatching(anchorBounds) : screen.getPrimaryDisplay();
   const { x, y, width, height } = display.workArea;
-  const size = expanded ? { width: 604, height: 282 } : { width: 308, height: 63 };
+  const size = expanded
+    ? {
+        width: clamp(expandedSize.width, expandedMinSize.width, width),
+        height: clamp(expandedSize.height, expandedMinSize.height, height)
+      }
+    : { width: 308, height: 63 };
   const centerX = anchorBounds ? anchorBounds.x + anchorBounds.width / 2 : x + width / 2;
   const top = anchorBounds ? anchorBounds.y : y + 18;
   const left = Math.round(clamp(centerX - size.width / 2, x, x + width - size.width));
@@ -580,4 +587,28 @@ ipcMain.handle("spotify:dashboard", () => {
 ipcMain.handle("island:expanded", (_event, expanded) => {
   setWindowBounds(Boolean(expanded));
   return true;
+});
+
+ipcMain.handle("island:resize-expanded", (_event, requestedSize) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return null;
+
+  const current = mainWindow.getBounds();
+  const display = screen.getDisplayMatching(current);
+  const workArea = display.workArea;
+  const requestedWidth = Number(requestedSize?.width);
+  const requestedHeight = Number(requestedSize?.height);
+  const width = Math.round(clamp(
+    Number.isFinite(requestedWidth) ? requestedWidth : current.width,
+    expandedMinSize.width,
+    workArea.x + workArea.width - current.x
+  ));
+  const height = Math.round(clamp(
+    Number.isFinite(requestedHeight) ? requestedHeight : current.height,
+    expandedMinSize.height,
+    workArea.y + workArea.height - current.y
+  ));
+
+  expandedSize = { width, height };
+  mainWindow.setBounds({ x: current.x, y: current.y, width, height }, false);
+  return { width, height };
 });

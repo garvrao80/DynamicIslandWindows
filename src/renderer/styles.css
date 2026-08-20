@@ -68,9 +68,9 @@ input {
 }
 
 .island.expanded-mode {
-  width: 604px;
-  height: 282px;
-  border-radius: 31px;
+  width: 100%;
+  height: 100%;
+  border-radius: clamp(24px, 5vw, 31px);
 }
 
 .compact {
@@ -248,11 +248,10 @@ button:active {
 .expanded {
   position: absolute;
   top: 0;
-  left: 50%;
-  margin-left: -302px;
-  width: 604px;
-  height: 282px;
-  padding: 18px;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  padding: clamp(12px, 3vw, 18px);
   opacity: 0;
   transform: scale(0.96);
   pointer-events: none;
@@ -268,8 +267,8 @@ button:active {
   position: absolute;
   top: -52px;
   left: -44px;
-  width: 330px;
-  height: 282px;
+  width: min(54%, 330px);
+  height: 100%;
   background-image: var(--artwork-url);
   background-size: cover;
   background-position: center;
@@ -302,18 +301,59 @@ button:active {
 
 .close-button {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: clamp(12px, 3vw, 16px);
+  right: clamp(12px, 3vw, 16px);
   z-index: 3;
   width: 32px;
   height: 32px;
   background: rgba(255, 255, 255, 0.12);
 }
 
+.resize-handle {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: nwse-resize;
+  -webkit-app-region: no-drag;
+}
+
+.resize-handle::before,
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  right: 6px;
+  bottom: 7px;
+  width: 10px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.72);
+  transform: rotate(-45deg);
+  transform-origin: right center;
+}
+
+.resize-handle::after {
+  right: 5px;
+  bottom: 11px;
+  width: 6px;
+  opacity: 0.55;
+}
+
+.resize-handle:hover,
+.resize-handle.resizing {
+  background: rgba(255, 255, 255, 0.18);
+}
+
 .expanded-grid {
   display: grid;
-  grid-template-columns: 238px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: clamp(190px, 39%, 238px) minmax(0, 1fr);
+  gap: clamp(10px, 3vw, 18px);
   height: 100%;
   position: relative;
   z-index: 1;
@@ -321,7 +361,7 @@ button:active {
 
 .now-playing {
   display: grid;
-  grid-template-rows: 126px minmax(42px, auto) 40px 18px 14px;
+  grid-template-rows: min(20vw, 44vh, 126px) minmax(36px, auto) 40px 18px 14px;
   align-content: center;
   justify-items: center;
   gap: 2px;
@@ -330,8 +370,8 @@ button:active {
 }
 
 .expanded-art {
-  width: 126px;
-  height: 126px;
+  width: min(20vw, 44vh, 126px);
+  height: min(20vw, 44vh, 126px);
   border-radius: 24px;
   box-shadow:
     0 18px 44px rgba(0, 0, 0, 0.4),
@@ -344,13 +384,13 @@ button:active {
 }
 
 .expanded-track {
-  max-width: 220px;
-  font-size: 20px;
+  max-width: 100%;
+  font-size: clamp(16px, 3.2vh, 20px);
   line-height: 1.14;
 }
 
 .expanded-artist {
-  max-width: 220px;
+  max-width: 100%;
   margin-top: 5px;
   font-size: 13px;
 }
@@ -364,7 +404,7 @@ button:active {
   grid-template-columns: 34px 1fr 34px;
   align-items: center;
   gap: 8px;
-  width: 220px;
+  width: min(220px, 100%);
   -webkit-app-region: no-drag;
 }
 
@@ -429,7 +469,7 @@ button:active {
 
 .lyrics-window {
   width: 100%;
-  height: 210px;
+  height: min(210px, calc(100vh - 36px));
   overflow: hidden;
   mask-image: linear-gradient(transparent, black 18%, black 82%, transparent);
 }
@@ -447,7 +487,7 @@ button:active {
   padding: 6px 16px;
   color: rgba(247, 248, 251, 0.3);
   font-family: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
-  font-size: 17px;
+  font-size: clamp(15px, 3.2vh, 20px);
   font-weight: 550;
   letter-spacing: -0.15px;
   line-height: 1.4;
