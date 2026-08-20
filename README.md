@@ -23,23 +23,62 @@ This is an open-source Electron app inspired by the macOS LyricsNotch concept an
 - A Spotify account; Spotify Premium is required for Web API playback control
 - A Spotify Developer application for live playback data
 
-## Quick start
+## Installation
 
-Clone and run the app locally:
+### Run from source (easiest for contributors)
+
+1. Install [Node.js 20 or newer](https://nodejs.org/).
+2. Open **PowerShell** and run:
+
+   ```powershell
+   git clone https://github.com/garvrao80/DynamicIslandWindows.git
+   cd DynamicIslandWindows
+   npm install
+   npm start
+   ```
+
+3. Lyrics Island will appear in the Windows system tray. Use the tray menu to show or hide it.
+
+To start it again later, open PowerShell in the project folder and run:
 
 ```powershell
-git clone https://github.com/garvrao80/DynamicIslandWindows.git
-cd DynamicIslandWindows
+npm start
+```
+
+### Create a portable Windows app
+
+From the project folder, run:
+
+```powershell
+npm install
+npm run pack
+```
+
+Then launch:
+
+```text
+release/Lyrics Island-win32-x64/Lyrics Island.exe
+```
+
+This creates an unpacked portable app and does not require running `npm start` afterward. The optional installer and portable artifacts can be created with `npm run dist`.
+
+## Quick start
+
+If the repository is already downloaded, run:
+
+```powershell
 npm install
 npm start
 ```
 
 To try the interface without connecting Spotify, leave **Demo** enabled in the settings panel.
 
-## Connect Spotify
+## Connect Spotify (optional)
 
-1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and create an application.
-2. In the application settings, add this exact redirect URI:
+Demo mode works without Spotify. To show live playback and lyrics:
+
+1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), sign in, and create an application.
+2. In the application settings, open **Redirect URIs** and add this exact URI:
 
    ```text
    http://127.0.0.1:43817/callback
@@ -51,6 +90,8 @@ To try the interface without connecting Spotify, leave **Demo** enabled in the s
 6. Start playback on an active Spotify device.
 
 The Client ID and OAuth tokens are stored locally in Electron's user-data directory. They are not sent to this repository or to a project-owned server. Lyrics are requested from LRCLIB using the track metadata.
+
+Spotify Web API playback control requires an active Spotify Premium account. If Spotify reports that playback is unavailable, confirm that the same Premium account is playing music on an active device.
 
 ## Using the island
 
