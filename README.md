@@ -119,6 +119,10 @@ Make sure Spotify is playing on an active device, the account is connected, and 
 
 Lyrics are supplied by LRCLIB and depend on the track's metadata. Some tracks do not have synced lyrics available. Try checking the title, artist, and album in Spotify, or adjust the lyric offset in Settings.
 
+### Lyrics appear stuck after changing songs
+
+Lyrics Island refreshes the lyric list when Spotify reports a new track. If an already-running copy was started before an update, close that copy completely from the tray and run `npm start` again. If only one song has no moving lines, LRCLIB may not have synced lyrics for that track; the expanded status line will show the lyric source and the app will continue monitoring the next track.
+
 ### The app does not start
 
 Close any existing Lyrics Island process, reinstall dependencies, and run:

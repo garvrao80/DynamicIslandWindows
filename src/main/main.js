@@ -62,6 +62,7 @@ const demoLyrics = {
 };
 
 const restartPreviousThresholdMs = 3000;
+const lyricLeadGuardMs = 250;
 const expandedMinSize = { width: 500, height: 246 };
 let expandedSize = { width: 604, height: 282 };
 
@@ -222,7 +223,8 @@ function createTray() {
 
 function activeLyricIndex(playback, lyrics) {
   if (!playback || !lyrics.synced.length) return -1;
-  const progress = (playback.progressMs || 0) + (config.lyricOffsetMs || 0);
+  const progress =
+    (playback.progressMs || 0) + (config.lyricOffsetMs || 0) - lyricLeadGuardMs;
   let index = -1;
 
   for (let i = 0; i < lyrics.synced.length; i += 1) {

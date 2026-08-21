@@ -345,7 +345,7 @@ button:active {
 
 .now-playing {
   display: grid;
-  grid-template-rows: min(20vw, 44vh, 126px) minmax(36px, 42px) 40px 18px 14px;
+  grid-template-rows: min(20vw, calc(100vh - 162px), 126px) minmax(42px, auto) 40px 18px 14px;
   align-content: center;
   justify-items: center;
   gap: 1px;
@@ -354,8 +354,8 @@ button:active {
 }
 
 .expanded-art {
-  width: min(20vw, 44vh, 126px);
-  height: min(20vw, 44vh, 126px);
+  width: min(20vw, calc(100vh - 162px), 126px);
+  height: min(20vw, calc(100vh - 162px), 126px);
   border-radius: 24px;
   box-shadow:
     0 18px 44px rgba(0, 0, 0, 0.4),
@@ -384,8 +384,8 @@ button:active {
 
 .expanded-artist {
   max-width: 100%;
-  margin-top: 5px;
-  font-size: 13px;
+  margin-top: clamp(2px, 1vh, 5px);
+  font-size: clamp(11px, 2.2vh, 13px);
 }
 
 .expanded-controls {

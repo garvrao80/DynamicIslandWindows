@@ -32,6 +32,7 @@ let lastLyricsKey = "";
 let playbackSampledAt = 0;
 let collapseFallbackTimer = null;
 let resizeSession = null;
+const lyricLeadGuardMs = 250;
 
 const icons = {
   previous:
@@ -88,7 +89,8 @@ function renderProgress(playback = {}) {
 
 function lyricIndexForProgress(progressMs) {
   const lines = currentState?.lyrics?.synced || [];
-  const adjustedProgress = progressMs + (Number(currentState?.config?.lyricOffsetMs) || 0);
+  const adjustedProgress =
+    progressMs + (Number(currentState?.config?.lyricOffsetMs) || 0) - lyricLeadGuardMs;
   let index = -1;
 
   for (let i = 0; i < lines.length; i += 1) {
@@ -198,7 +200,8 @@ function positionLyrics() {
 function renderLyrics(state) {
   const lines = state.lyrics?.synced || [];
   const index = Math.max(0, state.activeLyricIndex);
-  const lyricsKey = lines.map((line) => `${line.timeMs}:${line.text}`).join("|") || state.lyrics?.plain || "empty";
+  const trackKey = state.playback?.uri || `${state.playback?.track || "unknown"}|${state.playback?.artist || ""}`;
+  const lyricsKey = `${trackKey}::${lines.map((line) => `${line.timeMs}:${line.text}`).join("|") || state.lyrics?.plain || "empty"}`;
 
   if (lyricsKey !== lastLyricsKey) {
     lastLyricsKey = lyricsKey;
