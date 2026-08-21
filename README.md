@@ -97,10 +97,13 @@ Spotify Web API playback control requires an active Spotify Premium account. If 
 
 - Double-click the compact pill to expand it.
 - Drag the pill from the artwork or track information area.
+- In expanded mode, drag the bottom-right resize button to change the island size. The last expanded size is reused when you collapse and expand it again during the session.
 - Use the compact or expanded playback buttons to control Spotify.
 - Click the expanded progress bar to seek.
 - Open Settings to change the Client ID, demo mode, lyric offset, or opacity.
 - Use the tray icon to show, hide, toggle demo mode, or quit.
+
+The expanded layout resizes its artwork, controls, title, progress bar, and lyrics panel together. Long song titles wrap inside the metadata panel, and the active lyric remains centered while the island is being resized.
 
 ## Troubleshooting
 

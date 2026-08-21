@@ -23,6 +23,7 @@ const progressElapsed = document.getElementById("progressElapsed");
 const progressDuration = document.getElementById("progressDuration");
 const progressFill = document.getElementById("progressFill");
 const progressTrack = document.querySelector(".progress-track");
+const lyricsWindow = document.querySelector(".lyrics-window");
 
 let expanded = false;
 let currentState = null;
@@ -45,6 +46,9 @@ const icons = {
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>',
   settings:
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"></path><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3 14H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.3 7A2 2 0 1 1 7.1 4.2l.1.1a1.7 1.7 0 0 0 1.9.3h.1A1.7 1.7 0 0 0 10 3V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1A2 2 0 1 1 19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1A1.7 1.7 0 0 0 21 10h0a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>'
+  ,
+  resize:
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7 17 17M7 7h5M7 7v5M17 17h-5M17 17v-5"></path></svg>'
 };
 
 function setIcon(button, name) {
@@ -177,6 +181,20 @@ function currentLyric(state) {
   return state.demoMode ? "Demo mode" : "Waiting for Spotify playback";
 }
 
+function positionLyrics() {
+  if (!currentState) return;
+  const lines = currentState.lyrics?.synced || [];
+  const activeLyricIndex = currentState.activeLyricIndex;
+  const activeNode = lyricsList.children[Math.max(0, activeLyricIndex)];
+
+  if (lines.length && activeNode) {
+    const nodeCenter = activeNode.offsetTop + (activeNode.offsetHeight / 2);
+    lyricsList.style.transform = `translateY(${(lyricsWindow.clientHeight / 2) - nodeCenter}px)`;
+  } else {
+    lyricsList.style.transform = "translateY(90px)";
+  }
+}
+
 function renderLyrics(state) {
   const lines = state.lyrics?.synced || [];
   const index = Math.max(0, state.activeLyricIndex);
@@ -206,15 +224,7 @@ function renderLyrics(state) {
     row.classList.toggle("near", lines.length && Math.abs(rowIndex - state.activeLyricIndex) === 1);
   });
 
-  const centerOffset = 117; // Half of lyrics-window height (234/2)
-  const activeNode = lyricsList.children[Math.max(0, state.activeLyricIndex)];
-  
-  if (lines.length && activeNode) {
-    const nodeCenter = activeNode.offsetTop + (activeNode.offsetHeight / 2);
-    lyricsList.style.transform = `translateY(${centerOffset - nodeCenter}px)`;
-  } else {
-    lyricsList.style.transform = "translateY(90px)";
-  }
+  positionLyrics();
 }
 
 function render(state) {
@@ -295,6 +305,7 @@ resizeHandle.addEventListener("pointerdown", (event) => {
   };
   resizeHandle.setPointerCapture(event.pointerId);
   resizeHandle.classList.add("resizing");
+  island.classList.add("is-resizing");
 });
 
 resizeHandle.addEventListener("pointermove", (event) => {
@@ -310,6 +321,7 @@ function finishResize(event) {
   if (!resizeSession || event.pointerId !== resizeSession.pointerId) return;
   resizeSession = null;
   resizeHandle.classList.remove("resizing");
+  island.classList.remove("is-resizing");
 }
 
 resizeHandle.addEventListener("pointerup", finishResize);
@@ -367,6 +379,7 @@ connect.addEventListener("click", async () => {
 
 window.lyricsIsland.onState(render);
 window.lyricsIsland.getState().then(render);
+new ResizeObserver(positionLyrics).observe(lyricsWindow);
 setInterval(updatePlaybackEstimate, 100);
 
 setIcon(document.getElementById("previous"), "previous");
@@ -375,5 +388,6 @@ setIcon(document.getElementById("next"), "next");
 setIcon(document.getElementById("expandedNext"), "next");
 setIcon(document.getElementById("collapse"), "close");
 setIcon(settingsToggle, "settings");
+setIcon(resizeHandle, "resize");
 setIcon(play, "pause");
 setIcon(expandedPlay, "pause");

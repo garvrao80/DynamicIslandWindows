@@ -324,25 +324,9 @@ button:active {
   -webkit-app-region: no-drag;
 }
 
-.resize-handle::before,
-.resize-handle::after {
-  content: "";
-  position: absolute;
-  right: 6px;
-  bottom: 7px;
-  width: 10px;
-  height: 1.5px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.72);
-  transform: rotate(-45deg);
-  transform-origin: right center;
-}
-
-.resize-handle::after {
-  right: 5px;
-  bottom: 11px;
-  width: 6px;
-  opacity: 0.55;
+.resize-handle svg {
+  width: 17px;
+  height: 17px;
 }
 
 .resize-handle:hover,
@@ -361,10 +345,10 @@ button:active {
 
 .now-playing {
   display: grid;
-  grid-template-rows: min(20vw, 44vh, 126px) minmax(36px, auto) 40px 18px 14px;
+  grid-template-rows: min(20vw, 44vh, 126px) minmax(36px, 42px) 40px 18px 14px;
   align-content: center;
   justify-items: center;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
   padding-right: 4px;
 }
@@ -379,14 +363,23 @@ button:active {
 }
 
 .expanded-meta {
+  width: 100%;
   min-width: 0;
   text-align: center;
 }
 
 .expanded-track {
+  width: 100%;
   max-width: 100%;
+  display: -webkit-box;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: clamp(16px, 3.2vh, 20px);
-  line-height: 1.14;
+  line-height: 1.05;
 }
 
 .expanded-artist {
@@ -481,6 +474,10 @@ button:active {
   padding: 100px 0; /* extra padding to allow scrolling past edges */
   will-change: transform;
   transition: transform 460ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+
+.is-resizing .lyrics-list {
+  transition: none;
 }
 
 .lyric-line {
