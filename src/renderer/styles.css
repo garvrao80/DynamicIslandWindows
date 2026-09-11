@@ -476,6 +476,10 @@ button:active {
   transition: transform 460ms cubic-bezier(0.2, 0.85, 0.2, 1);
 }
 
+.lyrics-manual-scroll .lyrics-list {
+  transition: transform 100ms ease-out;
+}
+
 .is-resizing .lyrics-list {
   transition: none;
 }

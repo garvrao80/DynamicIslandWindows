@@ -32,7 +32,10 @@ let lastLyricsKey = "";
 let playbackSampledAt = 0;
 let collapseFallbackTimer = null;
 let resizeSession = null;
+let manualLyricsTransform = null;
+let lyricsScrollTimer = null;
 const lyricLeadGuardMs = 250;
+const lyricsScrollReturnDelayMs = 2000;
 
 const icons = {
   previous:
@@ -183,7 +186,7 @@ function currentLyric(state) {
   return state.demoMode ? "Demo mode" : "Waiting for Spotify playback";
 }
 
-function positionLyrics() {
+function activeLyricsTransform() {
   if (!currentState) return;
   const lines = currentState.lyrics?.synced || [];
   const activeLyricIndex = currentState.activeLyricIndex;
@@ -191,10 +194,53 @@ function positionLyrics() {
 
   if (lines.length && activeNode) {
     const nodeCenter = activeNode.offsetTop + (activeNode.offsetHeight / 2);
-    lyricsList.style.transform = `translateY(${(lyricsWindow.clientHeight / 2) - nodeCenter}px)`;
-  } else {
-    lyricsList.style.transform = "translateY(90px)";
+    return (lyricsWindow.clientHeight / 2) - nodeCenter;
   }
+
+  return 90;
+}
+
+function clampLyricsTransform(transform) {
+  const viewportHeight = lyricsWindow.clientHeight;
+  const listHeight = lyricsList.scrollHeight;
+  const minTransform = Math.min(0, viewportHeight - listHeight - 24);
+  const maxTransform = Math.max(0, Math.min(120, viewportHeight / 2 - 24));
+  return Math.min(maxTransform, Math.max(minTransform, transform));
+}
+
+function positionLyrics() {
+  if (!currentState) return;
+  const transform = manualLyricsTransform === null
+    ? activeLyricsTransform()
+    : manualLyricsTransform;
+  lyricsList.style.transform = `translateY(${clampLyricsTransform(transform)}px)`;
+}
+
+function returnToActiveLyrics() {
+  lyricsScrollTimer = null;
+  if (!currentState?.playback?.isPlaying) return;
+  manualLyricsTransform = null;
+  island.classList.remove("lyrics-manual-scroll");
+  positionLyrics();
+}
+
+function scheduleLyricsReturn() {
+  clearTimeout(lyricsScrollTimer);
+  if (!currentState?.playback?.isPlaying) return;
+  lyricsScrollTimer = setTimeout(returnToActiveLyrics, lyricsScrollReturnDelayMs);
+}
+
+function handleLyricsWheel(event) {
+  if (!currentState?.lyrics?.synced?.length) return;
+  event.preventDefault();
+
+  const startingTransform = manualLyricsTransform === null
+    ? activeLyricsTransform()
+    : manualLyricsTransform;
+  manualLyricsTransform = clampLyricsTransform(startingTransform - event.deltaY);
+  island.classList.add("lyrics-manual-scroll");
+  positionLyrics();
+  scheduleLyricsReturn();
 }
 
 function renderLyrics(state) {
@@ -205,6 +251,10 @@ function renderLyrics(state) {
 
   if (lyricsKey !== lastLyricsKey) {
     lastLyricsKey = lyricsKey;
+    manualLyricsTransform = null;
+    clearTimeout(lyricsScrollTimer);
+    lyricsScrollTimer = null;
+    island.classList.remove("lyrics-manual-scroll");
     lyricsList.innerHTML = "";
 
     if (!lines.length) {
@@ -383,6 +433,7 @@ connect.addEventListener("click", async () => {
 window.lyricsIsland.onState(render);
 window.lyricsIsland.getState().then(render);
 new ResizeObserver(positionLyrics).observe(lyricsWindow);
+lyricsWindow.addEventListener("wheel", handleLyricsWheel, { passive: false });
 setInterval(updatePlaybackEstimate, 100);
 
 setIcon(document.getElementById("previous"), "previous");
