@@ -486,6 +486,7 @@ button:active {
 
 .lyric-line {
   padding: 6px 16px;
+  cursor: pointer;
   color: rgba(247, 248, 251, 0.3);
   font-family: "Aptos Display", "Segoe UI Variable Display", "Segoe UI", sans-serif;
   font-size: clamp(15px, 3.2vh, 20px);
@@ -500,6 +501,10 @@ button:active {
     color 260ms ease,
     opacity 260ms ease,
     transform 360ms cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+
+.lyric-line:hover {
+  color: rgba(247, 248, 251, 0.82);
 }
 
 .lyric-line.near {

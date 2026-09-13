@@ -243,6 +243,33 @@ function handleLyricsWheel(event) {
   scheduleLyricsReturn();
 }
 
+function seekToLyric(event) {
+  const row = event.target.closest(".lyric-line");
+  if (!row || !currentState?.playback?.durationMs || !row.dataset.timeMs) return;
+
+  const timeMs = Number(row.dataset.timeMs);
+  if (!Number.isFinite(timeMs)) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  const lyricOffsetMs = Number(currentState.config?.lyricOffsetMs) || 0;
+  const positionMs = Math.min(
+    currentState.playback.durationMs,
+    Math.max(0, Math.round(timeMs - lyricOffsetMs + lyricLeadGuardMs))
+  );
+
+  clearTimeout(lyricsScrollTimer);
+  lyricsScrollTimer = null;
+  manualLyricsTransform = null;
+  island.classList.remove("lyrics-manual-scroll");
+  currentState.playback.progressMs = positionMs;
+  currentState.activeLyricIndex = Number(row.dataset.index);
+  playbackSampledAt = Date.now();
+  renderProgress(currentState.playback);
+  renderLyrics(currentState);
+  window.lyricsIsland.seek(positionMs);
+}
+
 function renderLyrics(state) {
   const lines = state.lyrics?.synced || [];
   const index = Math.max(0, state.activeLyricIndex);
@@ -263,9 +290,11 @@ function renderLyrics(state) {
       row.textContent = state.lyrics?.plain || "No synced lyrics yet";
       lyricsList.appendChild(row);
     } else {
-      lines.forEach((line) => {
+      lines.forEach((line, lineIndex) => {
         const row = document.createElement("div");
         row.className = "lyric-line";
+        row.dataset.index = String(lineIndex);
+        row.dataset.timeMs = String(line.timeMs);
         row.textContent = line.text;
         lyricsList.appendChild(row);
       });
@@ -434,6 +463,7 @@ window.lyricsIsland.onState(render);
 window.lyricsIsland.getState().then(render);
 new ResizeObserver(positionLyrics).observe(lyricsWindow);
 lyricsWindow.addEventListener("wheel", handleLyricsWheel, { passive: false });
+lyricsList.addEventListener("click", seekToLyric);
 setInterval(updatePlaybackEstimate, 100);
 
 setIcon(document.getElementById("previous"), "previous");

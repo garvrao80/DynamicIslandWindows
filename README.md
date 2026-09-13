@@ -99,6 +99,7 @@ Spotify Web API playback control requires an active Spotify Premium account. If 
 - Drag the pill from the artwork or track information area.
 - In expanded mode, drag the bottom-right resize button to change the island size. The last expanded size is reused when you collapse and expand it again during the session.
 - In expanded mode, scroll over the lyrics to browse manually. When playback is active, the lyrics return to the current line after about two seconds without scrolling.
+- Click any synced lyric line in expanded mode to seek Spotify directly to that part of the song.
 - Use the compact or expanded playback buttons to control Spotify.
 - Click the expanded progress bar to seek.
 - Open Settings to change the Client ID, demo mode, lyric offset, or opacity.
