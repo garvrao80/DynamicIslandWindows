@@ -9,6 +9,7 @@ const lyricsList = document.getElementById("lyricsList");
 const statusNode = document.getElementById("status");
 const clientId = document.getElementById("clientId");
 const demoMode = document.getElementById("demoMode");
+const startAtLogin = document.getElementById("startAtLogin");
 const offset = document.getElementById("offset");
 const opacityInput = document.getElementById("opacity");
 const settings = document.getElementById("settings");
@@ -329,6 +330,7 @@ function render(state) {
 
   if (document.activeElement !== clientId) clientId.value = state.config?.spotifyClientId || "";
   if (document.activeElement !== demoMode) demoMode.checked = Boolean(state.config?.demoMode);
+  if (document.activeElement !== startAtLogin) startAtLogin.checked = Boolean(state.config?.startAtLogin);
   if (document.activeElement !== offset) offset.value = String(state.config?.lyricOffsetMs || 0);
   if (document.activeElement !== opacityInput) {
     const opacityVal = state.config?.opacity !== undefined ? state.config.opacity : 100;
@@ -431,6 +433,7 @@ settings.addEventListener("submit", async (event) => {
   await window.lyricsIsland.saveConfig({
     spotifyClientId: clientId.value.trim(),
     demoMode: demoMode.checked,
+    startAtLogin: startAtLogin.checked,
     lyricOffsetMs: Number(offset.value || 0),
     opacity: Number(opacityInput.value || 100)
   });
@@ -448,6 +451,7 @@ connect.addEventListener("click", async () => {
   await window.lyricsIsland.saveConfig({
     spotifyClientId: clientId.value.trim(),
     demoMode: false,
+    startAtLogin: startAtLogin.checked,
     lyricOffsetMs: Number(offset.value || 0),
     opacity: Number(opacityInput.value || 100)
   });

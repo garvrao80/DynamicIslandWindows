@@ -11,6 +11,8 @@ const defaultConfig = {
   pollIntervalMs: 5000,
   startAtLogin: false,
   position: "top-center",
+  windowPosition: null,
+  expandedSize: { width: 604, height: 282 },
   demoMode: true
 };
 

@@ -20,6 +20,7 @@ let tray;
 let config;
 let timer;
 let boundsAnimation;
+let preferenceSaveTimer;
 let lastTrackKey = "";
 let lastPlaybackRefreshAt = 0;
 let rateLimitUntil = 0;
@@ -157,9 +158,24 @@ function targetBounds(expanded = false, anchorBounds = null) {
         height: clamp(expandedSize.height, expandedMinSize.height, height)
       }
     : { width: 308, height: 63 };
+  const savedPosition = config?.windowPosition;
+  const savedLeft = Number(savedPosition?.x);
+  const savedTop = Number(savedPosition?.y);
   const centerX = anchorBounds ? anchorBounds.x + anchorBounds.width / 2 : x + width / 2;
-  const top = anchorBounds ? anchorBounds.y : y + 18;
-  const left = Math.round(clamp(centerX - size.width / 2, x, x + width - size.width));
+  const top = anchorBounds
+    ? anchorBounds.y
+    : Number.isFinite(savedTop)
+      ? savedTop
+      : y + 18;
+  const left = Math.round(clamp(
+    anchorBounds
+      ? centerX - size.width / 2
+      : Number.isFinite(savedLeft)
+        ? savedLeft
+        : centerX - size.width / 2,
+    x,
+    x + width - size.width
+  ));
   const clampedTop = Math.round(clamp(top, y, y + height - size.height));
 
   return { x: left, y: clampedTop, ...size };
@@ -194,9 +210,23 @@ function createWindow() {
 
   mainWindow.setBackgroundColor("#00000000");
   mainWindow.setAlwaysOnTop(true, "screen-saver");
+  mainWindow.on("move", schedulePreferenceSave);
   mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
   setWindowBounds(false, false);
   mainWindow.once("ready-to-show", () => mainWindow.show());
+}
+
+function schedulePreferenceSave() {
+  clearTimeout(preferenceSaveTimer);
+  preferenceSaveTimer = setTimeout(() => {
+    if (!mainWindow || mainWindow.isDestroyed() || !config) return;
+    const bounds = mainWindow.getBounds();
+    config = writeConfig({
+      ...config,
+      windowPosition: { x: bounds.x, y: bounds.y },
+      expandedSize
+    });
+  }, 500);
 }
 
 function createTray() {
@@ -431,6 +461,15 @@ app.on("second-instance", () => {
 app.whenReady().then(() => {
   if (!hasAppLock) return;
   config = readConfig();
+  const savedExpandedSize = config.expandedSize || {};
+  expandedSize = {
+    width: Number.isFinite(Number(savedExpandedSize.width))
+      ? Number(savedExpandedSize.width)
+      : expandedSize.width,
+    height: Number.isFinite(Number(savedExpandedSize.height))
+      ? Number(savedExpandedSize.height)
+      : expandedSize.height
+  };
   app.setLoginItemSettings({ openAtLogin: Boolean(config.startAtLogin) });
 
   createWindow();
@@ -445,6 +484,15 @@ app.on("window-all-closed", (event) => {
 
 app.on("before-quit", () => {
   clearInterval(timer);
+  clearTimeout(preferenceSaveTimer);
+  if (mainWindow && !mainWindow.isDestroyed() && config) {
+    const bounds = mainWindow.getBounds();
+    writeConfig({
+      ...config,
+      windowPosition: { x: bounds.x, y: bounds.y },
+      expandedSize
+    });
+  }
 });
 
 ipcMain.handle("state:get", () => state);
@@ -612,5 +660,6 @@ ipcMain.handle("island:resize-expanded", (_event, requestedSize) => {
 
   expandedSize = { width, height };
   mainWindow.setBounds({ x: current.x, y: current.y, width, height }, false);
+  schedulePreferenceSave();
   return { width, height };
 });

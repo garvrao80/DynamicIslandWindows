@@ -103,9 +103,10 @@ Spotify Web API playback control requires an active Spotify Premium account. If 
 - Use the compact or expanded playback buttons to control Spotify.
 - Click the expanded progress bar to seek.
 - Open Settings to change the Client ID, demo mode, lyric offset, or opacity.
+- Enable **Start with Windows** in Settings to launch Lyrics Island automatically when you sign in.
 - Use the tray icon to show, hide, toggle demo mode, or quit.
 
-The expanded layout resizes its artwork, controls, title, progress bar, and lyrics panel together. Long song titles wrap inside the metadata panel, and the active lyric remains centered while the island is being resized.
+The expanded layout resizes its artwork, controls, title, progress bar, and lyrics panel together. Long song titles wrap inside the metadata panel, and the active lyric remains centered while the island is being resized. The island’s position and expanded size are saved locally and restored the next time the app starts.
 
 ## Troubleshooting
 
