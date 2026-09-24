@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell } = require("electron");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 const { readConfig, writeConfig } = require("./config");
 const { fetchLyrics } = require("./lyrics");
 const {
@@ -14,6 +15,9 @@ const hasAppLock = app.requestSingleInstanceLock();
 if (!hasAppLock) {
   app.quit();
 }
+
+const rendererPath = path.resolve(__dirname, "../renderer/index.html");
+const trustedRendererUrl = pathToFileURL(rendererPath).href;
 
 let mainWindow;
 let tray;
@@ -149,6 +153,64 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function assertTrustedRenderer(event) {
+  if (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    event.sender !== mainWindow.webContents ||
+    event.senderFrame?.url !== trustedRendererUrl
+  ) {
+    throw new Error("Blocked IPC request from an untrusted renderer.");
+  }
+}
+
+function validateConfigUpdate(nextConfig) {
+  if (!nextConfig || typeof nextConfig !== "object" || Array.isArray(nextConfig)) {
+    throw new TypeError("Settings must be an object.");
+  }
+
+  const allowedKeys = new Set([
+    "spotifyClientId",
+    "demoMode",
+    "startAtLogin",
+    "lyricOffsetMs",
+    "opacity"
+  ]);
+  if (Object.keys(nextConfig).some((key) => !allowedKeys.has(key))) {
+    throw new TypeError("Settings contain an unsupported field.");
+  }
+
+  const update = {};
+  if (Object.hasOwn(nextConfig, "spotifyClientId")) {
+    if (typeof nextConfig.spotifyClientId !== "string" || nextConfig.spotifyClientId.length > 256) {
+      throw new TypeError("Spotify Client ID must be a string of at most 256 characters.");
+    }
+    update.spotifyClientId = nextConfig.spotifyClientId.trim();
+  }
+  if (Object.hasOwn(nextConfig, "demoMode")) {
+    if (typeof nextConfig.demoMode !== "boolean") throw new TypeError("Demo mode must be a boolean.");
+    update.demoMode = nextConfig.demoMode;
+  }
+  if (Object.hasOwn(nextConfig, "startAtLogin")) {
+    if (typeof nextConfig.startAtLogin !== "boolean") throw new TypeError("Start at login must be a boolean.");
+    update.startAtLogin = nextConfig.startAtLogin;
+  }
+  if (Object.hasOwn(nextConfig, "lyricOffsetMs")) {
+    if (typeof nextConfig.lyricOffsetMs !== "number" || !Number.isFinite(nextConfig.lyricOffsetMs)) {
+      throw new TypeError("Lyric offset must be a finite number.");
+    }
+    update.lyricOffsetMs = Math.round(clamp(nextConfig.lyricOffsetMs, -60000, 60000));
+  }
+  if (Object.hasOwn(nextConfig, "opacity")) {
+    if (typeof nextConfig.opacity !== "number" || !Number.isFinite(nextConfig.opacity)) {
+      throw new TypeError("Opacity must be a finite number.");
+    }
+    update.opacity = Math.round(clamp(nextConfig.opacity, 10, 100));
+  }
+
+  return update;
+}
+
 function targetBounds(expanded = false, anchorBounds = null) {
   const display = anchorBounds ? screen.getDisplayMatching(anchorBounds) : screen.getPrimaryDisplay();
   const { x, y, width, height } = display.workArea;
@@ -204,14 +266,24 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true,
+      webviewTag: false
     }
   });
 
   mainWindow.setBackgroundColor("#00000000");
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.on("move", schedulePreferenceSave);
-  mainWindow.loadFile(path.join(__dirname, "../renderer/index.html"));
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  mainWindow.webContents.on("will-navigate", (event, navigationUrl) => {
+    if (navigationUrl !== trustedRendererUrl) event.preventDefault();
+  });
+  mainWindow.webContents.on("will-redirect", (event, navigationUrl) => {
+    if (navigationUrl !== trustedRendererUrl) event.preventDefault();
+  });
+  mainWindow.webContents.on("will-attach-webview", (event) => event.preventDefault());
+  mainWindow.loadFile(rendererPath);
   setWindowBounds(false, false);
   mainWindow.once("ready-to-show", () => mainWindow.show());
 }
@@ -495,12 +567,17 @@ app.on("before-quit", () => {
   }
 });
 
-ipcMain.handle("state:get", () => state);
+ipcMain.handle("state:get", (event) => {
+  assertTrustedRenderer(event);
+  return state;
+});
 
-ipcMain.handle("config:save", (_event, nextConfig) => {
-  const leavingDemo = config.demoMode && nextConfig.demoMode === false;
-  const enteringDemo = !config.demoMode && nextConfig.demoMode === true;
-  config = writeConfig({ ...config, ...nextConfig });
+ipcMain.handle("config:save", (event, nextConfig) => {
+  assertTrustedRenderer(event);
+  const update = validateConfigUpdate(nextConfig);
+  const leavingDemo = config.demoMode && update.demoMode === false;
+  const enteringDemo = !config.demoMode && update.demoMode === true;
+  config = writeConfig({ ...config, ...update });
   if (leavingDemo || enteringDemo) {
     rateLimitUntil = 0;
     rateLimitKind = "";
@@ -515,7 +592,8 @@ ipcMain.handle("config:save", (_event, nextConfig) => {
   return state;
 });
 
-ipcMain.handle("spotify:connect", async () => {
+ipcMain.handle("spotify:connect", async (event) => {
+  assertTrustedRenderer(event);
   rateLimitUntil = 0;
   rateLimitKind = "";
   clearPlaybackState();
@@ -526,7 +604,12 @@ ipcMain.handle("spotify:connect", async () => {
   return state;
 });
 
-ipcMain.handle("spotify:control", async (_event, action) => {
+ipcMain.handle("spotify:control", async (event, action) => {
+  assertTrustedRenderer(event);
+  if (!["play", "pause", "next", "previous"].includes(action)) {
+    throw new TypeError("Unsupported playback action.");
+  }
+
   if (config.demoMode) {
     if (action === "previous" && demoPlayback.progressMs > restartPreviousThresholdMs) {
       demoPlayback.progressMs = 0;
@@ -598,8 +681,13 @@ ipcMain.handle("spotify:control", async (_event, action) => {
   return state;
 });
 
-ipcMain.handle("spotify:seek", async (_event, positionMs) => {
-  const safePosition = Math.max(0, Math.round(Number(positionMs) || 0));
+ipcMain.handle("spotify:seek", async (event, positionMs) => {
+  assertTrustedRenderer(event);
+  if (typeof positionMs !== "number" || !Number.isFinite(positionMs) || positionMs < 0) {
+    throw new TypeError("Seek position must be a finite, non-negative number.");
+  }
+  const durationMs = config.demoMode ? demoPlayback.durationMs : state.playback?.durationMs;
+  const safePosition = Math.round(clamp(positionMs, 0, durationMs || Number.MAX_SAFE_INTEGER));
 
   if (config.demoMode) {
     demoPlayback.progressMs = Math.min(safePosition, demoPlayback.durationMs);
@@ -629,20 +717,38 @@ ipcMain.handle("spotify:seek", async (_event, positionMs) => {
   return state;
 });
 
-ipcMain.handle("spotify:dashboard", () => {
+ipcMain.handle("spotify:dashboard", (event) => {
+  assertTrustedRenderer(event);
   shell.openExternal("https://developer.spotify.com/dashboard");
   return true;
 });
 
-ipcMain.handle("island:expanded", (_event, expanded) => {
+ipcMain.handle("island:expanded", (event, expanded) => {
+  assertTrustedRenderer(event);
+  if (typeof expanded !== "boolean") throw new TypeError("Expanded state must be a boolean.");
   setWindowBounds(Boolean(expanded));
   return true;
 });
 
-ipcMain.handle("island:resize-expanded", (_event, requestedSize) => {
+ipcMain.handle("island:resize-expanded", (event, requestedSize) => {
+  assertTrustedRenderer(event);
   if (!mainWindow || mainWindow.isDestroyed()) return null;
+  if (
+    !requestedSize ||
+    typeof requestedSize !== "object" ||
+    Array.isArray(requestedSize) ||
+    typeof requestedSize.width !== "number" ||
+    !Number.isFinite(requestedSize.width) ||
+    typeof requestedSize.height !== "number" ||
+    !Number.isFinite(requestedSize.height)
+  ) {
+    throw new TypeError("Resize dimensions must be finite numbers.");
+  }
 
   const current = mainWindow.getBounds();
+  if (current.width < expandedMinSize.width || current.height < expandedMinSize.height) {
+    throw new Error("The island can only be resized while expanded.");
+  }
   const display = screen.getDisplayMatching(current);
   const workArea = display.workArea;
   const requestedWidth = Number(requestedSize?.width);

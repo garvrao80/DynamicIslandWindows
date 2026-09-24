@@ -91,6 +91,8 @@ Demo mode works without Spotify. To show live playback and lyrics:
 
 The Client ID and OAuth tokens are stored locally in Electron's user-data directory. They are not sent to this repository or to a project-owned server. Lyrics are requested from LRCLIB using the track metadata.
 
+The bundled renderer is protected by a Content Security Policy, cannot navigate to other pages or open popups, and can only request allowlisted settings and playback actions from the main process.
+
 Spotify Web API playback control requires an active Spotify Premium account. If Spotify reports that playback is unavailable, confirm that the same Premium account is playing music on an active device.
 
 ## Using the island
