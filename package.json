@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "test": "node --test",
     "pack": "electron-packager . \"Lyrics Island\" --platform=win32 --arch=x64 --icon=assets/lyrics-island.ico --out=release --overwrite --ignore=release --ignore=.git",
     "dist": "electron-builder --win nsis portable"
   },

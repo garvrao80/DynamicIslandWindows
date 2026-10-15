@@ -89,7 +89,7 @@ Demo mode works without Spotify. To show live playback and lyrics:
 5. Complete Spotify sign-in in the browser.
 6. Start playback on an active Spotify device.
 
-The Client ID and OAuth tokens are stored locally in Electron's user-data directory. They are not sent to this repository or to a project-owned server. Lyrics are requested from LRCLIB using the track metadata.
+The Client ID and OAuth tokens are stored locally in Electron's user-data directory. They are not sent to this repository or to a project-owned server. Lyrics are requested from LRCLIB using the track metadata. If an exact/structured match misses (for example, Spotify puts a featured artist in the title), Lyrics Island also tries a combined title-and-artist search and selects the closest candidate using artist, album, and duration metadata, preferring timed lyrics.
 
 The bundled renderer is protected by a Content Security Policy, cannot navigate to other pages or open popups, and can only request allowlisted settings and playback actions from the main process.
 
@@ -122,7 +122,7 @@ Make sure Spotify is playing on an active device, the account is connected, and 
 
 ### No lyrics appear
 
-Lyrics are supplied by LRCLIB and depend on the track's metadata. Some tracks do not have synced lyrics available. Try checking the title, artist, and album in Spotify, or adjust the lyric offset in Settings.
+Lyrics are supplied by LRCLIB and depend on the track's metadata. Lyrics Island tries exact, structured, and broader title/artist matching, but some tracks still have no LRCLIB entry with timestamps. If a lookup returns no lyrics, the app retries periodically while that same track is playing, so a temporary lookup failure does not leave the island stuck without lyrics. Plain-text lyrics can appear without line-by-line sync. Try checking the title and artist in Spotify, or adjust the lyric offset in Settings.
 
 ### Lyrics appear stuck after changing songs
 

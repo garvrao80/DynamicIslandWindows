@@ -27,6 +27,7 @@ let boundsAnimation;
 let preferenceSaveTimer;
 let lastTrackKey = "";
 let lastPlaybackRefreshAt = 0;
+let lastLyricsLookupAt = 0;
 let rateLimitUntil = 0;
 let rateLimitKind = "";
 let currentLyrics = { synced: [], plain: "", source: "none" };
@@ -102,7 +103,7 @@ async function lyricsForPlayback(playback) {
     lyrics = { synced: [], plain: "", source: "none" };
   }
 
-  if (cacheKey) {
+  if (cacheKey && (lyrics.synced?.length || lyrics.plain)) {
     lyricsCache.set(cacheKey, lyrics);
     if (lyricsCache.size > lyricsCacheLimit) {
       lyricsCache.delete(lyricsCache.keys().next().value);
@@ -127,6 +128,7 @@ function publicConfig() {
 function clearPlaybackState() {
   lastTrackKey = "";
   lastPlaybackRefreshAt = 0;
+  lastLyricsLookupAt = 0;
   currentLyrics = { synced: [], plain: "", source: "none" };
   return {
     playback: null,
@@ -419,6 +421,7 @@ async function refreshPlayback(options = {}) {
     if (trackKey && trackKey !== lastTrackKey) {
       lastTrackKey = trackKey;
       currentLyrics = { synced: [], plain: "", source: "loading" };
+      lastLyricsLookupAt = 0;
       publishState({
         status: "Loading lyrics",
         playback,
@@ -427,6 +430,21 @@ async function refreshPlayback(options = {}) {
       });
 
       currentLyrics = await lyricsForPlayback(playback);
+      lastLyricsLookupAt = Date.now();
+    } else if (
+      trackKey &&
+      currentLyrics.source === "none" &&
+      Date.now() - lastLyricsLookupAt >= 30_000
+    ) {
+      currentLyrics = { synced: [], plain: "", source: "loading" };
+      publishState({
+        status: "Retrying lyrics",
+        playback,
+        lyrics: currentLyrics,
+        activeLyricIndex: -1
+      });
+      currentLyrics = await lyricsForPlayback(playback);
+      lastLyricsLookupAt = Date.now();
     } else if (playback.empty) {
       lastTrackKey = "";
       currentLyrics = { synced: [], plain: "", source: "none" };
