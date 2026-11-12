@@ -3,6 +3,7 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { readConfig, writeConfig } = require("./config");
 const { fetchLyrics } = require("./lyrics");
+const { readLyricsCache, writeLyricsCache } = require("./lyricsCache");
 const {
   startSpotifyLogin,
   refreshAccessToken,
@@ -28,10 +29,12 @@ let preferenceSaveTimer;
 let lastTrackKey = "";
 let lastPlaybackRefreshAt = 0;
 let lastLyricsLookupAt = 0;
+let lyricsRetryDelayMs = 30_000;
+let lyricsCachePath = "";
 let rateLimitUntil = 0;
 let rateLimitKind = "";
 let currentLyrics = { synced: [], plain: "", source: "none" };
-const lyricsCache = new Map();
+let lyricsCache = new Map();
 const lyricsCacheLimit = 50;
 let state = {
   status: "Starting",
@@ -89,11 +92,11 @@ function lyricsCacheKey(playback) {
 
 async function lyricsForPlayback(playback) {
   const cacheKey = lyricsCacheKey(playback);
-  if (cacheKey && lyricsCache.has(cacheKey)) {
-    const cachedLyrics = lyricsCache.get(cacheKey);
+  if (cacheKey && lyricsCache.get(cacheKey)?.lyrics.synced?.length) {
+    const cachedEntry = lyricsCache.get(cacheKey);
     lyricsCache.delete(cacheKey);
-    lyricsCache.set(cacheKey, cachedLyrics);
-    return cachedLyrics;
+    lyricsCache.set(cacheKey, cachedEntry);
+    return cachedEntry.lyrics;
   }
 
   let lyrics;
@@ -103,11 +106,12 @@ async function lyricsForPlayback(playback) {
     lyrics = { synced: [], plain: "", source: "none" };
   }
 
-  if (cacheKey && (lyrics.synced?.length || lyrics.plain)) {
-    lyricsCache.set(cacheKey, lyrics);
+  if (cacheKey && lyrics.synced?.length) {
+    lyricsCache.set(cacheKey, { lyrics, cachedAt: Date.now() });
     if (lyricsCache.size > lyricsCacheLimit) {
       lyricsCache.delete(lyricsCache.keys().next().value);
     }
+    if (lyricsCachePath) writeLyricsCache(lyricsCachePath, lyricsCache);
   }
 
   return lyrics;
@@ -129,6 +133,7 @@ function clearPlaybackState() {
   lastTrackKey = "";
   lastPlaybackRefreshAt = 0;
   lastLyricsLookupAt = 0;
+  lyricsRetryDelayMs = 30_000;
   currentLyrics = { synced: [], plain: "", source: "none" };
   return {
     playback: null,
@@ -422,6 +427,7 @@ async function refreshPlayback(options = {}) {
       lastTrackKey = trackKey;
       currentLyrics = { synced: [], plain: "", source: "loading" };
       lastLyricsLookupAt = 0;
+      lyricsRetryDelayMs = 30_000;
       publishState({
         status: "Loading lyrics",
         playback,
@@ -429,22 +435,29 @@ async function refreshPlayback(options = {}) {
         activeLyricIndex: -1
       });
 
-      currentLyrics = await lyricsForPlayback(playback);
+      const foundLyrics = await lyricsForPlayback(playback);
+      if (lastTrackKey !== trackKey) return;
+      currentLyrics = foundLyrics;
       lastLyricsLookupAt = Date.now();
+      lyricsRetryDelayMs = Math.max(30_000, currentLyrics.retryAfterMs || 0);
     } else if (
       trackKey &&
-      currentLyrics.source === "none" &&
-      Date.now() - lastLyricsLookupAt >= 30_000
+      !currentLyrics.synced.length &&
+      currentLyrics.source !== "loading" &&
+      Date.now() - lastLyricsLookupAt >= lyricsRetryDelayMs
     ) {
-      currentLyrics = { synced: [], plain: "", source: "loading" };
+      currentLyrics = { ...currentLyrics, source: "loading" };
       publishState({
         status: "Retrying lyrics",
         playback,
         lyrics: currentLyrics,
         activeLyricIndex: -1
       });
-      currentLyrics = await lyricsForPlayback(playback);
+      const foundLyrics = await lyricsForPlayback(playback);
+      if (lastTrackKey !== trackKey) return;
+      currentLyrics = foundLyrics;
       lastLyricsLookupAt = Date.now();
+      lyricsRetryDelayMs = Math.max(30_000, currentLyrics.retryAfterMs || 0);
     } else if (playback.empty) {
       lastTrackKey = "";
       currentLyrics = { synced: [], plain: "", source: "none" };
@@ -551,6 +564,8 @@ app.on("second-instance", () => {
 app.whenReady().then(() => {
   if (!hasAppLock) return;
   config = readConfig();
+  lyricsCachePath = path.join(app.getPath("userData"), "lyrics-cache.json");
+  lyricsCache = readLyricsCache(lyricsCachePath);
   const savedExpandedSize = config.expandedSize || {};
   expandedSize = {
     width: Number.isFinite(Number(savedExpandedSize.width))

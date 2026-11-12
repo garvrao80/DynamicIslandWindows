@@ -4,6 +4,8 @@ Lyrics Island is a lightweight, floating music controller for Windows. It puts t
 
 This is an open-source Electron app inspired by the macOS LyricsNotch concept and rebuilt with Windows-friendly primitives.
 
+**Windows beta — contributors welcome.** [Download v0.1.1-beta.1](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.1) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Report a bug](https://github.com/garvrao80/DynamicIslandWindows/issues/new/choose)
+
 ## Features
 
 - Always-on-top floating pill with compact and expanded views
@@ -19,13 +21,22 @@ This is an open-source Electron app inspired by the macOS LyricsNotch concept an
 ## Requirements
 
 - Windows 10 or Windows 11
-- Node.js 20 or newer
+- Node.js 20 or newer and Git only if running from source
 - A Spotify account; Spotify Premium is required for Web API playback control
 - A Spotify Developer application for live playback data
 
 ## Installation
 
-### Run from source (easiest for contributors)
+### Download a Windows build
+
+1. Open the [beta release](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.1).
+2. Download **LyricsIsland-Setup-0.1.1-beta.1-x64.exe** to install, or **LyricsIsland-Portable-0.1.1-beta.1-x64.exe** to run without installation. Neither needs Node.js or a terminal.
+3. Quit any older Lyrics Island instance from its tray menu, then launch the downloaded app. The installer creates Windows shortcuts.
+4. Double-click the pill to expand it, open Settings, and follow **Connect Spotify** below. Demo mode works without Spotify credentials.
+
+The beta builds are unsigned and Windows may show a reputation warning. Live playback still requires Spotify setup. Synced lyrics come from LRCLIB and are not available for every song. Report problems through the issue template, including the version and launch method.
+
+### Run from source
 
 1. Install [Node.js 20 or newer](https://nodejs.org/).
 2. Open **PowerShell** and run:
@@ -89,6 +100,8 @@ Demo mode works without Spotify. To show live playback and lyrics:
 5. Complete Spotify sign-in in the browser.
 6. Start playback on an active Spotify device.
 
+Each user currently needs their own Spotify Developer application. Spotify requires the owner of a development-mode app to have Premium; development-mode apps are intended for personal use or small tests, and additional users need to be allowlisted. Playback control also requires Premium. See [Spotify's current quota-mode requirements](https://developer.spotify.com/documentation/web-api/concepts/quota-modes).
+
 The Client ID and OAuth tokens are stored locally in Electron's user-data directory. They are not sent to this repository or to a project-owned server. Lyrics are requested from LRCLIB using the track metadata. If an exact/structured match misses (for example, Spotify puts a featured artist in the title), Lyrics Island also tries a combined title-and-artist search and selects the closest candidate using artist, album, and duration metadata, preferring timed lyrics.
 
 The bundled renderer is protected by a Content Security Policy, cannot navigate to other pages or open popups, and can only request allowlisted settings and playback actions from the main process.
@@ -114,7 +127,7 @@ The expanded layout resizes its artwork, controls, title, progress bar, and lyri
 
 ### Spotify API quota or rate limit
 
-Spotify may temporarily return a quota or rate-limit response. Lyrics Island pauses requests and retries after the server-provided cooldown. If the quota belongs to your Spotify Developer application, wait for Spotify to reset it or try another Client ID.
+Spotify may temporarily return a quota or rate-limit response. Lyrics Island pauses requests and retries after the server-provided cooldown. Wait for Spotify to reset the limit; development-mode apps on the same developer account share a quota.
 
 ### No track appears
 
@@ -122,9 +135,11 @@ Make sure Spotify is playing on an active device, the account is connected, and 
 
 ### No lyrics appear
 
-Lyrics are supplied by LRCLIB and depend on the track's metadata. Lyrics Island tries exact, structured, and broader title/artist matching, but some tracks still have no LRCLIB entry with timestamps. If a lookup returns no lyrics, the app retries periodically while that same track is playing, so a temporary lookup failure does not leave the island stuck without lyrics. Plain-text lyrics can appear without line-by-line sync. Try checking the title and artist in Spotify, or adjust the lyric offset in Settings.
+Lyrics are supplied by LRCLIB and depend on the track's metadata. Lyrics Island tries exact, structured, and normalized title/artist matching (including featured-artist and alternate artist-separator variants). Successfully fetched lyrics are cached locally for up to 90 days (50 recent tracks) so they load across restarts even if LRCLIB is temporarily unavailable. If LRCLIB rate-limits a new track, Lyrics Island pauses follow-up searches and retries after the provider's cooldown instead of sending repeated requests. Otherwise, missing lyrics are retried periodically while the same track plays. Some tracks still have no LRCLIB entry with timestamps; plain-text lyrics can appear without line-by-line sync. Try checking the title and artist in Spotify, or adjust the lyric offset in Settings.
 
 ### Lyrics appear stuck after changing songs
+
+When timed and plain-text records both exist, Lyrics Island prefers a timed record with matching metadata and a similar duration. Plain-text results are retried and do not prevent a later synced match from being fetched. The status row identifies plain lyrics when timing is unavailable.
 
 Lyrics Island refreshes the lyric list when Spotify reports a new track. If an already-running copy was started before an update, close that copy completely from the tray and run `npm start` again. If only one song has no moving lines, LRCLIB may not have synced lyrics for that track; the expanded status line will show the lyric source and the app will continue monitoring the next track.
 
@@ -159,6 +174,8 @@ npm run dist
 
 Build output is written to `release/`. If electron-builder cannot unpack its signing helper on your machine, enable Windows Developer Mode or use an elevated terminal. `npm run pack` is sufficient for local testing.
 
+The Windows build workflow runs tests and produces installer and portable build artifacts on GitHub Actions. These artifacts are unsigned test builds; they are not automatically published as a GitHub Release.
+
 ## Project structure
 
 ```text
@@ -171,7 +188,9 @@ The app intentionally uses Electron for fast Windows distribution. A future WinU
 
 ## Contributing
 
-Issues and pull requests are welcome. For changes:
+Contributors and beta testers are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, tests, and pull request guidance, and [ROADMAP.md](ROADMAP.md) for proposed projects. Starter areas include setup documentation, accessibility, clean-install testing, and Windows media-session research.
+
+For changes:
 
 1. Fork the repository.
 2. Create a focused branch.

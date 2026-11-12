@@ -1,5 +1,15 @@
 const cache = new Map();
 const requestHeaders = { "User-Agent": "LyricsIslandWindows/0.1.0" };
+let providerCooldownUntil = 0;
+
+function isProviderCoolingDown() {
+  return Date.now() < providerCooldownUntil;
+}
+
+function parseRetryAfterMs(value) {
+  const seconds = Number(value) || 60;
+  return Math.max(30, Math.min(seconds, 300)) * 1000;
+}
 
 function parseSyncedLyrics(raw) {
   if (!raw) return [];
@@ -64,16 +74,29 @@ function candidateScore(candidate, playback) {
   // Reject title collisions unless another strong metadata signal confirms the match.
   const supportedByMetadata = artistScore >= 0.25 || albumScore >= 0.35;
   if (titleScore < 0.6 || !supportedByMetadata) return -1;
+  if (Number(playback.durationMs) > 0 && Number.isFinite(durationDeltaMs) && durationDeltaMs > 10_000) return -1;
 
   return titleScore * 40 + artistScore * 36 + albumScore * 16 + durationScore + (candidate.syncedLyrics ? 15 : 0);
 }
 
+function hasUsableSync(candidate, playback) {
+  const lines = parseSyncedLyrics(candidate?.syncedLyrics);
+  return new Set(lines.map((line) => line.timeMs)).size >= 2 &&
+    (!playback.durationMs || lines[lines.length - 1].timeMs <= playback.durationMs + 10_000);
+}
+
 async function requestJson(url) {
+  if (isProviderCoolingDown()) return null;
+
   try {
     const response = await fetch(url, {
       headers: requestHeaders,
       signal: AbortSignal.timeout(8000)
     });
+    if (response.status === 429) {
+      providerCooldownUntil = Date.now() + parseRetryAfterMs(response.headers.get("Retry-After"));
+      return null;
+    }
     if (!response.ok) return null;
     return await response.json();
   } catch {
@@ -89,23 +112,25 @@ async function findBestSearchMatch(playback) {
   const structuredResults = await requestJson(`https://lrclib.net/api/search?${structuredParams}`);
   const candidates = Array.isArray(structuredResults) ? [...structuredResults] : [];
   const structuredMatch = rankCandidates(candidates, playback);
-  if (structuredMatch?.syncedLyrics) return structuredMatch;
+  if (hasUsableSync(structuredMatch, playback)) return structuredMatch;
+  if (isProviderCoolingDown()) return null;
 
   // Spotify's title often includes a featuring credit that LRCLIB stores in
   // the artist field (or vice versa). A broad query can find those records.
-  // Keep Spotify's original title in the query too: normalization can remove
-  // featured-artist text that LRCLIB uses to index alternate track versions.
-  const queries = [
-    `${playback.track || ""} ${playback.artist || ""}`.trim(),
-    `${normalizeName(playback.track)} ${playback.artist || ""}`.trim(),
-    playback.track || ""
+  // LRCLIB may index a featured credit as a separate artist joined with "y",
+  // while Spotify returns "feat." in the title and commas in the artist list.
+  // Search normalized metadata first, then keep an original-text fallback.
+  const broadQueries = [
+    `${normalizeName(playback.track)} ${normalizeName(playback.artist)}`.trim(),
+    `${playback.track || ""} ${playback.artist || ""}`.trim()
   ].filter((query, index, all) => query && all.indexOf(query) === index);
-  for (const query of queries) {
-    const broadParams = new URLSearchParams({ q: query });
+  for (const broadQuery of broadQueries) {
+    const broadParams = new URLSearchParams({ q: broadQuery });
     const broadResults = await requestJson(`https://lrclib.net/api/search?${broadParams}`);
     if (Array.isArray(broadResults)) candidates.push(...broadResults);
     const bestMatch = rankCandidates(candidates, playback);
-    if (bestMatch?.syncedLyrics) return bestMatch;
+    if (hasUsableSync(bestMatch, playback)) return bestMatch;
+    if (isProviderCoolingDown()) break;
   }
 
   return rankCandidates(candidates, playback);
@@ -122,7 +147,10 @@ function rankCandidates(candidates, playback) {
     })
     .map((candidate) => ({ candidate, score: candidateScore(candidate, playback) }))
     .filter(({ score }) => score >= 0)
-    .sort((a, b) => b.score - a.score)[0]?.candidate || null;
+    .sort((a, b) =>
+      Number(hasUsableSync(b.candidate, playback)) - Number(hasUsableSync(a.candidate, playback)) ||
+      b.score - a.score
+    )[0]?.candidate || null;
 }
 
 async function fetchLyrics(playback) {
@@ -138,19 +166,23 @@ async function fetchLyrics(playback) {
   });
   let payload = await requestJson(`https://lrclib.net/api/get?${exactParams}`);
 
-  if (!payload?.syncedLyrics) {
+  if (!hasUsableSync(payload, playback)) {
     const searchMatch = await findBestSearchMatch(playback);
     // Keep a synced match over an exact plain-text-only result.
-    if (searchMatch?.syncedLyrics || !payload?.plainLyrics) payload = searchMatch || payload;
+    if (hasUsableSync(searchMatch, playback) || !payload?.plainLyrics) payload = searchMatch || payload;
   }
 
   const result = {
-    synced: parseSyncedLyrics(payload?.syncedLyrics),
+    synced: hasUsableSync(payload, playback) ? parseSyncedLyrics(payload.syncedLyrics) : [],
     plain: payload?.plainLyrics || "",
-    source: payload ? "LRCLIB" : "none"
+    source: payload ? "LRCLIB" : isProviderCoolingDown() ? "rate-limited" : "none",
+    retryAfterMs: isProviderCoolingDown() ? Math.max(0, providerCooldownUntil - Date.now()) : 0
   };
 
-  if (result.synced.length || result.plain) cache.set(key, result);
+  if (result.synced.length) {
+    cache.set(key, result);
+    if (cache.size > 50) cache.delete(cache.keys().next().value);
+  }
   return result;
 }
 
@@ -159,5 +191,6 @@ module.exports = {
   parseSyncedLyrics,
   candidateScore,
   normalizeName,
-  tokenSimilarity
+  tokenSimilarity,
+  parseRetryAfterMs
 };

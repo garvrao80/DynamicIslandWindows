@@ -176,7 +176,7 @@ function currentLyric(state) {
   const index = state.activeLyricIndex;
 
   if (index >= 0 && lines[index]) return lines[index].text;
-  if (state.lyrics?.plain) return state.lyrics.plain.split(/\r?\n/)[0];
+  if (state.lyrics?.plain) return "Lyrics available without timing";
   // Keep transport/auth status out of the compact lyric preview. Those
   // messages belong in the expanded status row and should not replace the
   // track context while Spotify is recovering from a temporary 429.
@@ -321,7 +321,12 @@ function render(state) {
   renderCompactLyric(state);
   expandedTrack.textContent = title;
   expandedArtist.textContent = artist;
-  statusNode.textContent = `${state.status || "Ready"} - ${state.lyrics?.source || "none"}`;
+  const lyricsSource = state.lyrics?.source === "rate-limited"
+    ? "LRCLIB rate limited; will retry"
+    : state.lyrics?.plain && !state.lyrics?.synced?.length
+      ? "Plain lyrics; sync unavailable"
+      : state.lyrics?.source || "none";
+  statusNode.textContent = `${state.status || "Ready"} - ${lyricsSource}`;
   updatePlayIcons(playback.isPlaying);
 
   applyArtwork(art, playback.artworkUrl);
