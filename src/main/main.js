@@ -3,6 +3,7 @@ const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { readConfig, writeConfig } = require("./config");
 const { fetchLyrics } = require("./lyrics");
+const { getWindowsPlayback, requestWindowsMedia, closeWindowsMedia } = require("./windowsMedia");
 const { readLyricsCache, writeLyricsCache } = require("./lyricsCache");
 const {
   startSpotifyLogin,
@@ -24,9 +25,11 @@ let mainWindow;
 let tray;
 let config;
 let timer;
-let boundsAnimation;
+let windowExpanded = false;
 let preferenceSaveTimer;
 let lastTrackKey = "";
+let playbackRequest = 0;
+let latestAppliedRequest = 0;
 let lastPlaybackRefreshAt = 0;
 let lastLyricsLookupAt = 0;
 let lyricsRetryDelayMs = 30_000;
@@ -117,19 +120,27 @@ async function lyricsForPlayback(playback) {
   return lyrics;
 }
 
-function publicConfig() {
+function songOffset(uri) {
+  const value = config.songOffsets?.[uri];
+  return Number.isFinite(value) ? value : 0;
+}
+
+function publicConfig(playback) {
   return {
     spotifyClientId: config.spotifyClientId,
     lyricOffsetMs: config.lyricOffsetMs,
+    songOffsetMs: songOffset(playback?.uri),
     pollIntervalMs: config.pollIntervalMs,
     startAtLogin: config.startAtLogin,
     position: config.position,
     demoMode: config.demoMode,
+    windowsMedia: config.windowsMedia,
     opacity: config.opacity ?? 100
   };
 }
 
 function clearPlaybackState() {
+  latestAppliedRequest = ++playbackRequest;
   lastTrackKey = "";
   lastPlaybackRefreshAt = 0;
   lastLyricsLookupAt = 0;
@@ -179,6 +190,7 @@ function validateConfigUpdate(nextConfig) {
   const allowedKeys = new Set([
     "spotifyClientId",
     "demoMode",
+    "windowsMedia",
     "startAtLogin",
     "lyricOffsetMs",
     "opacity"
@@ -188,6 +200,10 @@ function validateConfigUpdate(nextConfig) {
   }
 
   const update = {};
+  if (Object.hasOwn(nextConfig, "windowsMedia")) {
+    if (typeof nextConfig.windowsMedia !== "boolean") throw new TypeError("Invalid playback source");
+    update.windowsMedia = nextConfig.windowsMedia;
+  }
   if (Object.hasOwn(nextConfig, "spotifyClientId")) {
     if (typeof nextConfig.spotifyClientId !== "string" || nextConfig.spotifyClientId.length > 256) {
       throw new TypeError("Spotify Client ID must be a string of at most 256 characters.");
@@ -321,7 +337,9 @@ function createTray() {
         checked: config.demoMode,
         click: (item) => {
           config = writeConfig({ ...config, demoMode: item.checked });
-          publishState({ status: item.checked ? "Demo mode" : "Spotify mode" });
+          closeWindowsMedia();
+          publishState({ ...clearPlaybackState(), status: item.checked ? "Demo mode" : "Spotify mode" });
+          startLoop();
         }
       },
       { type: "separator" },
@@ -333,7 +351,7 @@ function createTray() {
 function activeLyricIndex(playback, lyrics) {
   if (!playback || !lyrics.synced.length) return -1;
   const progress =
-    (playback.progressMs || 0) + (config.lyricOffsetMs || 0) - lyricLeadGuardMs;
+    (playback.progressMs || 0) + (config.lyricOffsetMs || 0) + songOffset(playback.uri) - lyricLeadGuardMs;
   let index = -1;
 
   for (let i = 0; i < lyrics.synced.length; i += 1) {
@@ -367,7 +385,7 @@ function publishState(patch = {}) {
     ...patch,
     connected: Boolean(config.accessToken),
     demoMode: config.demoMode,
-    config: publicConfig()
+    config: publicConfig(Object.hasOwn(patch, "playback") ? patch.playback : state.playback)
   };
 
   if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
@@ -375,7 +393,24 @@ function publishState(patch = {}) {
   }
 }
 
+async function refreshSavedToken() {
+  const { accessToken, refreshToken, tokenExpiresAt } = await refreshAccessToken(config);
+  config = writeConfig({ ...config, accessToken, refreshToken, tokenExpiresAt });
+}
+
+async function completeLyricsLookup(playback, pending) {
+  const lyrics = await lyricsForPlayback(playback);
+  if (currentLyrics !== pending || state.playback?.uri !== playback.uri) return;
+  currentLyrics = lyrics;
+  lastLyricsLookupAt = Date.now();
+  lyricsRetryDelayMs = Math.max(30_000, lyrics.retryAfterMs || 0);
+  const latest = estimatedPlayback();
+  lastPlaybackRefreshAt = Date.now();
+  publishState({ playback: latest, lyrics, activeLyricIndex: activeLyricIndex(latest, lyrics) });
+}
+
 async function refreshPlayback(options = {}) {
+  const request = ++playbackRequest;
   try {
     if (config.demoMode) {
       demoPlayback.progressMs = (demoPlayback.progressMs + config.pollIntervalMs) % 30000;
@@ -389,7 +424,8 @@ async function refreshPlayback(options = {}) {
       return;
     }
 
-    if (!config.accessToken) {
+    const local = config.windowsMedia;
+    if (!local && !config.accessToken) {
       publishState({
         status: "Connect Spotify to begin",
         ...clearPlaybackState()
@@ -397,7 +433,7 @@ async function refreshPlayback(options = {}) {
       return;
     }
 
-    if (Date.now() < rateLimitUntil) {
+    if (!local && Date.now() < rateLimitUntil) {
       const playback = state.playback?.uri?.startsWith("demo:") ? null : estimatedPlayback();
       const status = rateLimitKind === "quota" ? "Spotify API quota exceeded" : "Spotify cooling down";
       publishState({
@@ -409,12 +445,13 @@ async function refreshPlayback(options = {}) {
       return;
     }
 
-    if (Date.now() > config.tokenExpiresAt - 60_000) {
-      config = writeConfig(await refreshAccessToken(config));
+    if (!local && Date.now() > config.tokenExpiresAt - 60_000) {
+      await refreshSavedToken();
     }
 
-    const playback = await getCurrentPlayback(config);
-    lastPlaybackRefreshAt = Date.now();
+    const playback = local ? await getWindowsPlayback() : await getCurrentPlayback(config);
+    if (request < latestAppliedRequest || config.demoMode || config.windowsMedia !== local) return;
+    latestAppliedRequest = request;
     rateLimitUntil = 0;
     rateLimitKind = "";
     const trackKey = playback.empty ? "" : playback.uri;
@@ -423,23 +460,14 @@ async function refreshPlayback(options = {}) {
       return playback;
     }
 
+    lastPlaybackRefreshAt = Date.now();
+    let needsLookup = false;
     if (trackKey && trackKey !== lastTrackKey) {
       lastTrackKey = trackKey;
       currentLyrics = { synced: [], plain: "", source: "loading" };
       lastLyricsLookupAt = 0;
       lyricsRetryDelayMs = 30_000;
-      publishState({
-        status: "Loading lyrics",
-        playback,
-        lyrics: currentLyrics,
-        activeLyricIndex: -1
-      });
-
-      const foundLyrics = await lyricsForPlayback(playback);
-      if (lastTrackKey !== trackKey) return;
-      currentLyrics = foundLyrics;
-      lastLyricsLookupAt = Date.now();
-      lyricsRetryDelayMs = Math.max(30_000, currentLyrics.retryAfterMs || 0);
+      needsLookup = true;
     } else if (
       trackKey &&
       !currentLyrics.synced.length &&
@@ -447,32 +475,27 @@ async function refreshPlayback(options = {}) {
       Date.now() - lastLyricsLookupAt >= lyricsRetryDelayMs
     ) {
       currentLyrics = { ...currentLyrics, source: "loading" };
-      publishState({
-        status: "Retrying lyrics",
-        playback,
-        lyrics: currentLyrics,
-        activeLyricIndex: -1
-      });
-      const foundLyrics = await lyricsForPlayback(playback);
-      if (lastTrackKey !== trackKey) return;
-      currentLyrics = foundLyrics;
-      lastLyricsLookupAt = Date.now();
-      lyricsRetryDelayMs = Math.max(30_000, currentLyrics.retryAfterMs || 0);
+      needsLookup = true;
     } else if (playback.empty) {
       lastTrackKey = "";
       currentLyrics = { synced: [], plain: "", source: "none" };
     }
 
     publishState({
-      status: playback.empty ? "Nothing playing" : "Spotify connected",
+      status: local
+        ? (playback.empty ? "Play Spotify on this PC" : playback.durationMs ? "Spotify on this PC" : "Windows timing unavailable")
+        : (playback.empty ? "Nothing playing" : "Spotify connected"),
       playback,
       lyrics: currentLyrics,
       activeLyricIndex: activeLyricIndex(playback, currentLyrics)
     });
+    if (needsLookup) void completeLyricsLookup(playback, currentLyrics);
+    return playback;
   } catch (error) {
+    if (request < latestAppliedRequest) return;
     if (error.message === "spotify-token-expired") {
       try {
-        config = writeConfig(await refreshAccessToken(config));
+        await refreshSavedToken();
       } catch (refreshError) {
         publishState({ status: `Reconnect Spotify (${refreshError.message})` });
         return;
@@ -523,7 +546,10 @@ async function refreshPlayback(options = {}) {
     }
 
 
-    publishState({ status: error.message || "Playback refresh failed" });
+    publishState({
+      status: error.message || "Playback refresh failed",
+      ...(config.windowsMedia && !config.demoMode ? clearPlaybackState() : {})
+    });
   }
 }
 
@@ -535,8 +561,6 @@ function startLoop() {
 
 async function refreshAfterTrackSkip(previousTrackKey) {
   const retryDelays = [80, 140, 220, 340, 520, 760];
-
-  publishState({ status: "Skipping track" });
 
   for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
     const playback = await refreshPlayback({ waitForTrackChangeFrom: previousTrackKey });
@@ -588,6 +612,7 @@ app.on("window-all-closed", (event) => {
 });
 
 app.on("before-quit", () => {
+  closeWindowsMedia();
   clearInterval(timer);
   clearTimeout(preferenceSaveTimer);
   if (mainWindow && !mainWindow.isDestroyed() && config) {
@@ -610,13 +635,15 @@ ipcMain.handle("config:save", (event, nextConfig) => {
   const update = validateConfigUpdate(nextConfig);
   const leavingDemo = config.demoMode && update.demoMode === false;
   const enteringDemo = !config.demoMode && update.demoMode === true;
+  const switchingSource = update.windowsMedia !== undefined && update.windowsMedia !== config.windowsMedia;
   config = writeConfig({ ...config, ...update });
-  if (leavingDemo || enteringDemo) {
+  if (leavingDemo || enteringDemo || switchingSource) {
+    closeWindowsMedia();
     rateLimitUntil = 0;
     rateLimitKind = "";
     publishState({
       status: enteringDemo ? "Demo mode" : "Connecting to Spotify",
-      ...(leavingDemo ? clearPlaybackState() : {})
+      ...clearPlaybackState()
     });
   }
   app.setLoginItemSettings({ openAtLogin: Boolean(config.startAtLogin) });
@@ -625,13 +652,28 @@ ipcMain.handle("config:save", (event, nextConfig) => {
   return state;
 });
 
+ipcMain.handle("lyrics:adjust-timing", (event, uri, action) => {
+  assertTrustedRenderer(event);
+  if (!uri || uri !== state.playback?.uri || !state.lyrics?.synced?.length) return;
+  if (!["early", "late", "reset"].includes(action)) throw new TypeError("Invalid timing action");
+  const offsets = { ...config.songOffsets };
+  const change = action === "early" ? -250 : 250;
+  const next = action === "reset" ? 0 : clamp(songOffset(uri) + change, -60000, 60000);
+  if (next) offsets[uri] = next;
+  else delete offsets[uri];
+  config = writeConfig({ ...config, songOffsets: offsets });
+  const playback = estimatedPlayback();
+  lastPlaybackRefreshAt = Date.now();
+  publishState({ playback, activeLyricIndex: activeLyricIndex(playback, state.lyrics) });
+});
+
 ipcMain.handle("spotify:connect", async (event) => {
   assertTrustedRenderer(event);
   rateLimitUntil = 0;
   rateLimitKind = "";
   clearPlaybackState();
   const token = await startSpotifyLogin(config.spotifyClientId);
-  config = writeConfig({ ...config, ...token, demoMode: false });
+  config = writeConfig({ ...config, ...token, demoMode: false, windowsMedia: false });
   publishState({ status: "Spotify connected" });
   await refreshPlayback();
   return state;
@@ -667,7 +709,7 @@ ipcMain.handle("spotify:control", async (event, action) => {
   }
 
   const playback = estimatedPlayback();
-  if (action === "previous" && playback?.progressMs > restartPreviousThresholdMs) {
+  if (action === "previous" && playback?.progressMs > restartPreviousThresholdMs && playback.canSeek !== false) {
     const restartedPlayback = { ...playback, progressMs: 0 };
     publishState({
       status: "Restarted track",
@@ -677,7 +719,8 @@ ipcMain.handle("spotify:control", async (event, action) => {
     });
 
     try {
-      await seekPlayback(config, 0);
+      if (config.windowsMedia) await requestWindowsMedia("seek", 0);
+      else await seekPlayback(config, 0);
       await refreshPlayback();
     } catch (error) {
       if (error.code === "SPOTIFY_FORBIDDEN") {
@@ -698,7 +741,8 @@ ipcMain.handle("spotify:control", async (event, action) => {
 
   try {
     const previousTrackKey = state.playback?.empty ? "" : state.playback?.uri || "";
-    await controlPlayback(config, action);
+    if (config.windowsMedia) await requestWindowsMedia(action);
+    else await controlPlayback(config, action);
     if (action === "next" || action === "previous") {
       await refreshAfterTrackSkip(previousTrackKey);
     } else {
@@ -745,7 +789,8 @@ ipcMain.handle("spotify:seek", async (event, positionMs) => {
     });
   }
 
-  await seekPlayback(config, safePosition);
+  if (config.windowsMedia) await requestWindowsMedia("seek", safePosition);
+  else await seekPlayback(config, safePosition);
   await refreshPlayback();
   return state;
 });
@@ -759,7 +804,10 @@ ipcMain.handle("spotify:dashboard", (event) => {
 ipcMain.handle("island:expanded", (event, expanded) => {
   assertTrustedRenderer(event);
   if (typeof expanded !== "boolean") throw new TypeError("Expanded state must be a boolean.");
-  setWindowBounds(Boolean(expanded));
+  if (expanded !== windowExpanded) {
+    setWindowBounds(expanded);
+    windowExpanded = expanded;
+  }
   return true;
 });
 

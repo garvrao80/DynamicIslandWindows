@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("lyricsIsland", {
   openSpotifyDashboard: () => ipcRenderer.invoke("spotify:dashboard"),
   playback: (action) => ipcRenderer.invoke("spotify:control", action),
   seek: (positionMs) => ipcRenderer.invoke("spotify:seek", positionMs),
+  adjustTiming: (uri, action) => ipcRenderer.invoke("lyrics:adjust-timing", uri, action),
   setExpanded: (expanded) => ipcRenderer.invoke("island:expanded", expanded),
   resizeExpanded: (size) => ipcRenderer.invoke("island:resize-expanded", size),
   onState: (callback) => ipcRenderer.on("state:update", (_event, state) => callback(state))

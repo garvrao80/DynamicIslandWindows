@@ -4,7 +4,7 @@ Lyrics Island is a lightweight, floating music controller for Windows. It puts t
 
 This is an open-source Electron app inspired by the macOS LyricsNotch concept and rebuilt with Windows-friendly primitives.
 
-**Windows beta — contributors welcome.** [Download v0.1.1-beta.1](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.1) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Report a bug](https://github.com/garvrao80/DynamicIslandWindows/issues/new/choose)
+**Windows beta — contributors welcome.** [Download v0.1.1-beta.2](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.2) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Report a bug](https://github.com/garvrao80/DynamicIslandWindows/issues/new/choose)
 
 ## Features
 
@@ -20,21 +20,23 @@ This is an open-source Electron app inspired by the macOS LyricsNotch concept an
 
 ## Requirements
 
+On Windows 10 (1809+) or Windows 11, start Spotify desktop and play a track on this PC. Fresh profiles use Windows media sessions automatically. Existing users can double-click the pill, select **Settings → Spotify on this PC → Save**. This source reads local metadata, artwork when available, and playback position without a Client ID. Controls depend on what the desktop session supports. Lyrics still use LRCLIB. For Spotify Connect playback on another device, select **Spotify Web API** and use the connection instructions below.
+
 - Windows 10 or Windows 11
 - Node.js 20 or newer and Git only if running from source
 - A Spotify account; Spotify Premium is required for Web API playback control
-- A Spotify Developer application for live playback data
+- A Spotify Developer application only for the optional Spotify Web API source
 
 ## Installation
 
 ### Download a Windows build
 
-1. Open the [beta release](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.1).
-2. Download **LyricsIsland-Setup-0.1.1-beta.1-x64.exe** to install, or **LyricsIsland-Portable-0.1.1-beta.1-x64.exe** to run without installation. Neither needs Node.js or a terminal.
+1. Open the [beta release](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.2).
+2. Download **LyricsIsland-Setup-0.1.1-beta.2-x64.exe** to install, or **LyricsIsland-Portable-0.1.1-beta.2-x64.exe** to run without installation. Neither needs Node.js or a terminal.
 3. Quit any older Lyrics Island instance from its tray menu, then launch the downloaded app. The installer creates Windows shortcuts.
-4. Double-click the pill to expand it, open Settings, and follow **Connect Spotify** below. Demo mode works without Spotify credentials.
+4. Play a song in the Spotify desktop app. Double-click the pill to browse lyrics. If upgrading from the previous beta, choose **Settings → Spotify on this PC → Save** to use local playback.
 
-The beta builds are unsigned and Windows may show a reputation warning. Live playback still requires Spotify setup. Synced lyrics come from LRCLIB and are not available for every song. Report problems through the issue template, including the version and launch method.
+The beta builds are unsigned and Windows may show a reputation warning. Synced lyrics come from LRCLIB and are not available for every song. Report problems through the issue template, including the version and launch method.
 
 ### Run from source
 
@@ -82,11 +84,11 @@ npm install
 npm start
 ```
 
-To try the interface without connecting Spotify, leave **Demo** enabled in the settings panel.
+To try the interface without connecting Spotify, select **Demo** in Settings and save.
 
 ## Connect Spotify (optional)
 
-Demo mode works without Spotify. To show live playback and lyrics:
+For playback on another device, configure the optional Spotify Web API source.
 
 1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), sign in, and create an application.
 2. In the application settings, open **Redirect URIs** and add this exact URI:
@@ -96,11 +98,11 @@ Demo mode works without Spotify. To show live playback and lyrics:
    ```
 
 3. Start Lyrics Island and double-click the compact pill to expand it.
-4. Open Settings, paste the application's **Client ID**, and click **Connect**.
+4. Open Settings, select **Spotify Web API**, paste the application's **Client ID**, and click **Connect**.
 5. Complete Spotify sign-in in the browser.
 6. Start playback on an active Spotify device.
 
-Each user currently needs their own Spotify Developer application. Spotify requires the owner of a development-mode app to have Premium; development-mode apps are intended for personal use or small tests, and additional users need to be allowlisted. Playback control also requires Premium. See [Spotify's current quota-mode requirements](https://developer.spotify.com/documentation/web-api/concepts/quota-modes).
+Each Web API user needs their own Spotify Developer application. Spotify requires the owner of a development-mode app to have Premium; development-mode apps are intended for personal use or small tests, and additional users need to be allowlisted. Playback control also requires Premium. See [Spotify's current quota-mode requirements](https://developer.spotify.com/documentation/web-api/concepts/quota-modes).
 
 The Client ID and OAuth tokens are stored locally in Electron's user-data directory. They are not sent to this repository or to a project-owned server. Lyrics are requested from LRCLIB using the track metadata. If an exact/structured match misses (for example, Spotify puts a featured artist in the title), Lyrics Island also tries a combined title-and-artist search and selects the closest candidate using artist, album, and duration metadata, preferring timed lyrics.
 
@@ -110,11 +112,15 @@ Spotify Web API playback control requires an active Spotify Premium account. If 
 
 ## Using the island
 
+A fresh local profile prompts you to play a song in Spotify. Select **Spotify Web API** in Settings to reveal its Client ID and connection controls. On track changes, the island shows the confirmed title immediately, loads its cover, and displays **Finding lyrics…** until the lookup finishes.
+
 - Double-click the compact pill to expand it.
 - Drag the pill from the artwork or track information area.
 - In expanded mode, drag the bottom-right resize button to change the island size. The last expanded size is reused when you collapse and expand it again during the session.
 - In expanded mode, scroll over the lyrics to browse manually. When playback is active, the lyrics return to the current line after about two seconds without scrolling.
 - Click any synced lyric line in expanded mode to seek Spotify directly to that part of the song.
+- Fast lines use shorter slides. Select **Back to live** while browsing to center the active line immediately, even while paused.
+- In expanded Settings, **Lyrics early** delays the current song’s lyrics by 250 ms. **Lyrics late** advances them by 250 ms. Each click saves automatically for that song. **Reset** clears its correction. The global offset still applies across songs.
 - Use the compact or expanded playback buttons to control Spotify.
 - Click the expanded progress bar to seek.
 - Open Settings to change the Client ID, demo mode, lyric offset, or opacity.
@@ -131,7 +137,7 @@ Spotify may temporarily return a quota or rate-limit response. Lyrics Island pau
 
 ### No track appears
 
-Make sure Spotify is playing on an active device, the account is connected, and the app is not in Demo mode. Playback control through Spotify's Web API requires Premium.
+For local playback, play a song in Spotify desktop on this PC and select **Spotify on this PC**. For the Web API source, connect your account and start playback on an active device. Playback control through Spotify's Web API requires Premium.
 
 ### No lyrics appear
 

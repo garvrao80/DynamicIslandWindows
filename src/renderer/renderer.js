@@ -8,7 +8,7 @@ const expandedArtist = document.getElementById("expandedArtist");
 const lyricsList = document.getElementById("lyricsList");
 const statusNode = document.getElementById("status");
 const clientId = document.getElementById("clientId");
-const demoMode = document.getElementById("demoMode");
+const playbackSource = document.getElementById("playbackSource");
 const startAtLogin = document.getElementById("startAtLogin");
 const offset = document.getElementById("offset");
 const opacityInput = document.getElementById("opacity");
@@ -25,13 +25,18 @@ const progressDuration = document.getElementById("progressDuration");
 const progressFill = document.getElementById("progressFill");
 const progressTrack = document.querySelector(".progress-track");
 const lyricsWindow = document.querySelector(".lyrics-window");
+const backToLive = document.getElementById("backToLive");
+const songTiming = document.getElementById("songTiming");
+const timingButtons = settings.querySelectorAll("[data-timing]");
 
 let expanded = false;
 let currentState = null;
-let expandTimer = null;
+let requestedArtwork;
+let artworkVersion = 0;
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+let transitionVersion = 0;
 let lastLyricsKey = "";
 let playbackSampledAt = 0;
-let collapseFallbackTimer = null;
 let resizeSession = null;
 let manualLyricsTransform = null;
 let lyricsScrollTimer = null;
@@ -64,13 +69,26 @@ function playbackAction() {
   return currentState?.playback?.isPlaying ? "pause" : "play";
 }
 
-function applyArtwork(node, artworkUrl) {
-  if (!node) return;
-  node.style.backgroundImage = artworkUrl ? `url("${artworkUrl}")` : "";
+function fadeIn(node) {
+  if (!reducedMotion.matches) node.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 150 });
 }
 
-function applyArtworkGlow(artworkUrl) {
-  island.style.setProperty("--artwork-url", artworkUrl ? `url("${artworkUrl}")` : "none");
+async function updateArtwork(url) {
+  if (requestedArtwork === url) return;
+  requestedArtwork = url;
+  const version = ++artworkVersion;
+  art.style.backgroundImage = expandedArt.style.backgroundImage = "";
+  island.style.setProperty("--artwork-url", "none");
+  if (!url) return;
+  const image = new Image();
+  image.src = url;
+  try { await image.decode(); } catch { return; }
+  if (version !== artworkVersion) return;
+  const cover = `url("${url}")`;
+  art.style.backgroundImage = expandedArt.style.backgroundImage = cover;
+  island.style.setProperty("--artwork-url", cover);
+  fadeIn(art);
+  fadeIn(expandedArt);
 }
 
 function formatTime(ms = 0) {
@@ -91,10 +109,15 @@ function renderProgress(playback = {}) {
   progressFill.style.width = `${percent}%`;
 }
 
+function effectiveOffset() {
+  const config = currentState?.config;
+  return (Number(config?.lyricOffsetMs) || 0) + (Number(config?.songOffsetMs) || 0);
+}
+
 function lyricIndexForProgress(progressMs) {
   const lines = currentState?.lyrics?.synced || [];
   const adjustedProgress =
-    progressMs + (Number(currentState?.config?.lyricOffsetMs) || 0) - lyricLeadGuardMs;
+    progressMs + effectiveOffset() - lyricLeadGuardMs;
   let index = -1;
 
   for (let i = 0; i < lines.length; i += 1) {
@@ -135,7 +158,7 @@ function updatePlaybackEstimate() {
 
 function seekFromPointer(event) {
   const playback = currentState?.playback;
-  if (!playback?.durationMs) return;
+  if (!playback?.durationMs || playback.canSeek === false) return;
 
   const rect = progressTrack.getBoundingClientRect();
   const percent = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
@@ -145,7 +168,8 @@ function seekFromPointer(event) {
   playbackSampledAt = Date.now();
   currentState.activeLyricIndex = lyricIndexForProgress(positionMs);
   renderProgress(playback);
-  renderLyrics(currentState);
+  leaveManualScroll();
+  renderLyrics(currentState, true);
   window.lyricsIsland.seek(positionMs);
 }
 
@@ -162,13 +186,24 @@ function sendPlayback(action) {
     updatePlayIcons(isPlaying);
   }
 
-  window.lyricsIsland.playback(action);
+  return window.lyricsIsland.playback(action);
 }
 
 function handlePlaybackClick(event, action) {
   event.preventDefault();
   event.stopPropagation();
-  sendPlayback(action);
+  if ((action === "previous" || action === "next") && !reducedMotion.matches) {
+    event.currentTarget.animate([{ opacity: 0.5 }, { opacity: 1 }], { duration: 180 });
+    if (currentState?.playback?.track) {
+      for (const node of [lyric, lyricsWindow]) node.animate([{ opacity: 1 }, { opacity: 0.3 }, { opacity: 1 }], { duration: 200 });
+    }
+  }
+  sendPlayback(action).catch(() => { statusNode.textContent = "Playback control unavailable"; });
+}
+
+function idleLocal(state) {
+  return state.config?.windowsMedia && !state.config.demoMode && !state.playback?.track &&
+    (state.playback?.empty || state.status === "Ready");
 }
 
 function currentLyric(state) {
@@ -176,7 +211,10 @@ function currentLyric(state) {
   const index = state.activeLyricIndex;
 
   if (index >= 0 && lines[index]) return lines[index].text;
+  if (lines.length) return "Lyrics start soon";
   if (state.lyrics?.plain) return "Lyrics available without timing";
+  if (idleLocal(state)) return "Play a song in Spotify";
+  if (state.lyrics?.source === "loading") return "Finding lyrics…";
   // Keep transport/auth status out of the compact lyric preview. Those
   // messages belong in the expanded status row and should not replace the
   // track context while Spotify is recovering from a temporary 429.
@@ -217,18 +255,25 @@ function positionLyrics() {
   lyricsList.style.transform = `translateY(${clampLyricsTransform(transform)}px)`;
 }
 
-function returnToActiveLyrics() {
+function leaveManualScroll() {
+  clearTimeout(lyricsScrollTimer);
   lyricsScrollTimer = null;
-  if (!currentState?.playback?.isPlaying) return;
   manualLyricsTransform = null;
+  backToLive.hidden = true;
   island.classList.remove("lyrics-manual-scroll");
+}
+
+function returnToActiveLyrics() {
+  leaveManualScroll();
   positionLyrics();
 }
 
 function scheduleLyricsReturn() {
   clearTimeout(lyricsScrollTimer);
   if (!currentState?.playback?.isPlaying) return;
-  lyricsScrollTimer = setTimeout(returnToActiveLyrics, lyricsScrollReturnDelayMs);
+  lyricsScrollTimer = setTimeout(() => {
+    if (currentState?.playback?.isPlaying) returnToActiveLyrics();
+  }, lyricsScrollReturnDelayMs);
 }
 
 function handleLyricsWheel(event) {
@@ -240,55 +285,53 @@ function handleLyricsWheel(event) {
     : manualLyricsTransform;
   manualLyricsTransform = clampLyricsTransform(startingTransform - event.deltaY);
   island.classList.add("lyrics-manual-scroll");
+  backToLive.hidden = false;
   positionLyrics();
   scheduleLyricsReturn();
 }
 
 function seekToLyric(event) {
   const row = event.target.closest(".lyric-line");
-  if (!row || !currentState?.playback?.durationMs || !row.dataset.timeMs) return;
+  if (!row || !currentState?.playback?.durationMs || currentState.playback.canSeek === false || !row.dataset.timeMs) return;
 
   const timeMs = Number(row.dataset.timeMs);
   if (!Number.isFinite(timeMs)) return;
 
   event.preventDefault();
   event.stopPropagation();
-  const lyricOffsetMs = Number(currentState.config?.lyricOffsetMs) || 0;
+  const lyricOffsetMs = effectiveOffset();
   const positionMs = Math.min(
     currentState.playback.durationMs,
     Math.max(0, Math.round(timeMs - lyricOffsetMs + lyricLeadGuardMs))
   );
 
-  clearTimeout(lyricsScrollTimer);
-  lyricsScrollTimer = null;
-  manualLyricsTransform = null;
-  island.classList.remove("lyrics-manual-scroll");
+  leaveManualScroll();
   currentState.playback.progressMs = positionMs;
   currentState.activeLyricIndex = Number(row.dataset.index);
   playbackSampledAt = Date.now();
   renderProgress(currentState.playback);
-  renderLyrics(currentState);
+  renderLyrics(currentState, true);
   window.lyricsIsland.seek(positionMs);
 }
 
-function renderLyrics(state) {
+function renderLyrics(state, snap = false) {
   const lines = state.lyrics?.synced || [];
   const index = Math.max(0, state.activeLyricIndex);
   const trackKey = state.playback?.uri || `${state.playback?.track || "unknown"}|${state.playback?.artist || ""}`;
-  const lyricsKey = `${trackKey}::${lines.map((line) => `${line.timeMs}:${line.text}`).join("|") || state.lyrics?.plain || "empty"}`;
+  const placeholder = idleLocal(state) ? "Play a song in Spotify" :
+    state.lyrics?.source === "loading" ? "Finding lyrics…" : "No synced lyrics yet";
+  const lyricsKey = `${trackKey}::${lines.map((line) => `${line.timeMs}:${line.text}`).join("|") || state.lyrics?.plain || placeholder}`;
 
   if (lyricsKey !== lastLyricsKey) {
     lastLyricsKey = lyricsKey;
-    manualLyricsTransform = null;
-    clearTimeout(lyricsScrollTimer);
-    lyricsScrollTimer = null;
-    island.classList.remove("lyrics-manual-scroll");
+    snap = true;
+    leaveManualScroll();
     lyricsList.innerHTML = "";
 
     if (!lines.length) {
       const row = document.createElement("div");
       row.className = "lyric-line active";
-      row.textContent = state.lyrics?.plain || "No synced lyrics yet";
+      row.textContent = state.lyrics?.plain || placeholder;
       lyricsList.appendChild(row);
     } else {
       lines.forEach((line, lineIndex) => {
@@ -302,6 +345,9 @@ function renderLyrics(state) {
     }
   }
 
+  const gap = lines[index + 1] ? lines[index + 1].timeMs - lines[index].timeMs : 1200;
+  const duration = snap ? 0 : Math.min(380, Math.max(0, gap * 0.32));
+  lyricsList.style.setProperty("--follow-duration", duration + "ms");
   Array.from(lyricsList.children).forEach((row, rowIndex) => {
     row.classList.toggle("active", lines.length ? rowIndex === state.activeLyricIndex : true);
     row.classList.toggle("near", lines.length && Math.abs(rowIndex - state.activeLyricIndex) === 1);
@@ -311,9 +357,24 @@ function renderLyrics(state) {
 }
 
 function render(state) {
+  const previous = currentState?.playback;
+  const elapsed = previous?.isPlaying ? Date.now() - playbackSampledAt : 0;
+  const jumped = previous?.uri && previous.uri === state.playback?.uri &&
+    Math.abs(state.playback.progressMs - previous.progressMs - elapsed) > 1500;
   currentState = state;
   playbackSampledAt = Date.now();
   const playback = state.playback || {};
+  island.classList.toggle("local-idle", Boolean(idleLocal(state)));
+  if (previous?.uri !== playback.uri || (state.lyrics?.synced?.length && lyric.dataset.loading === "true")) {
+    fadeIn(lyric);
+    fadeIn(lyricsWindow);
+  }
+  lyric.dataset.loading = String(state.lyrics?.source === "loading");
+  if (jumped) leaveManualScroll();
+  if (manualLyricsTransform !== null && !previous?.isPlaying && playback.isPlaying) scheduleLyricsReturn();
+  const correction = state.config?.songOffsetMs || 0;
+  songTiming.textContent = "Song: " + (correction > 0 ? "+" : "") + correction + " ms";
+  for (const button of timingButtons) button.disabled = !playback.uri || !state.lyrics?.synced?.length;
   const title = playback.track || "Lyrics Island";
   const artist = playback.artist || "Windows floating lyrics";
 
@@ -329,12 +390,15 @@ function render(state) {
   statusNode.textContent = `${state.status || "Ready"} - ${lyricsSource}`;
   updatePlayIcons(playback.isPlaying);
 
-  applyArtwork(art, playback.artworkUrl);
-  applyArtwork(expandedArt, playback.artworkUrl);
-  applyArtworkGlow(playback.artworkUrl);
+  void updateArtwork(playback.artworkUrl);
 
   if (document.activeElement !== clientId) clientId.value = state.config?.spotifyClientId || "";
-  if (document.activeElement !== demoMode) demoMode.checked = Boolean(state.config?.demoMode);
+  const source = state.config?.demoMode ? "demo" : state.config?.windowsMedia ? "windows" : "web";
+  if (playbackSource.dataset.saved !== source) {
+    playbackSource.value = source;
+    playbackSource.dataset.saved = source;
+    updateWebFields();
+  }
   if (document.activeElement !== startAtLogin) startAtLogin.checked = Boolean(state.config?.startAtLogin);
   if (document.activeElement !== offset) offset.value = String(state.config?.lyricOffsetMs || 0);
   if (document.activeElement !== opacityInput) {
@@ -343,36 +407,31 @@ function render(state) {
     island.style.opacity = opacityVal / 100;
   }
   renderProgress(playback);
-  renderLyrics(state);
+  renderLyrics(state, jumped);
 }
 
-function setExpanded(nextExpanded) {
-  clearTimeout(expandTimer);
-  clearTimeout(collapseFallbackTimer);
+const nextFrame = () => new Promise(resolve => requestAnimationFrame(resolve));
+
+async function setExpanded(nextExpanded) {
   if (expanded === nextExpanded) return;
   expanded = nextExpanded;
+  const version = ++transitionVersion;
 
   if (expanded) {
-    // 1. Expand transparent native window instantly
-    window.lyricsIsland.setExpanded(true);
-    // 2. Add class so CSS can smoothly animate .island size inside the large window
-    expandTimer = setTimeout(() => {
-      island.classList.add("expanded-mode");
-    }, 20);
+    await window.lyricsIsland.setExpanded(true);
+    // Give Chromium a paint in the larger transparent window with the pill still compact.
+    await nextFrame();
+    await nextFrame();
+    if (version === transitionVersion) island.classList.add("expanded-mode");
   } else {
-    const shrinkNativeWindow = () => {
-      clearTimeout(collapseFallbackTimer);
-      island.removeEventListener("transitionend", onCollapseTransitionEnd);
-      window.lyricsIsland.setExpanded(false);
-    };
-    const onCollapseTransitionEnd = (event) => {
-      if (event.target === island && event.propertyName === "width") shrinkNativeWindow();
-    };
-
-    island.addEventListener("transitionend", onCollapseTransitionEnd);
-    island.classList.remove("expanded-mode");
-    island.classList.remove("settings-open");
-    collapseFallbackTimer = setTimeout(shrinkNativeWindow, 440);
+    leaveManualScroll();
+    island.classList.remove("expanded-mode", "settings-open");
+    // Collect only the shell and view transitions, not playback or lyric animations.
+    const views = [island, compact, island.querySelector(".expanded")];
+    const transitions = views.flatMap(view => view.getAnimations());
+    await Promise.allSettled(transitions.map(animation => animation.finished));
+    await nextFrame();
+    if (version === transitionVersion) await window.lyricsIsland.setExpanded(false);
   }
 }
 
@@ -426,7 +485,16 @@ progressTrack.addEventListener("pointerdown", (event) => {
   event.stopPropagation();
   seekFromPointer(event);
 });
+function updateWebFields() {
+  const hide = playbackSource.value !== "web";
+  for (const control of [clientId, dashboard, connect]) control.hidden = hide;
+}
+playbackSource.addEventListener("change", updateWebFields);
 settingsToggle.addEventListener("click", () => island.classList.toggle("settings-open"));
+backToLive.addEventListener("click", returnToActiveLyrics);
+for (const button of timingButtons) {
+  button.addEventListener("click", () => window.lyricsIsland.adjustTiming(currentState.playback.uri, button.dataset.timing));
+}
 dashboard.addEventListener("click", () => window.lyricsIsland.openSpotifyDashboard());
 
 opacityInput.addEventListener("input", (event) => {
@@ -436,8 +504,9 @@ opacityInput.addEventListener("input", (event) => {
 settings.addEventListener("submit", async (event) => {
   event.preventDefault();
   await window.lyricsIsland.saveConfig({
-    spotifyClientId: clientId.value.trim(),
-    demoMode: demoMode.checked,
+    ...(playbackSource.value === "web" ? { spotifyClientId: clientId.value.trim() } : {}),
+    demoMode: playbackSource.value === "demo",
+    windowsMedia: playbackSource.value === "windows",
     startAtLogin: startAtLogin.checked,
     lyricOffsetMs: Number(offset.value || 0),
     opacity: Number(opacityInput.value || 100)
@@ -456,6 +525,7 @@ connect.addEventListener("click", async () => {
   await window.lyricsIsland.saveConfig({
     spotifyClientId: clientId.value.trim(),
     demoMode: false,
+    windowsMedia: false,
     startAtLogin: startAtLogin.checked,
     lyricOffsetMs: Number(offset.value || 0),
     opacity: Number(opacityInput.value || 100)

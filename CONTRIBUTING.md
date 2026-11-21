@@ -18,7 +18,7 @@ npm test
 npm start
 ```
 
-Demo mode lets you work on the interface without Spotify credentials. Live playback requires your own Spotify Developer application; follow the README's connection instructions. Never add a Client Secret: the app uses PKCE.
+Demo mode lets you work on the interface without Spotify credentials. For live testing, play Spotify desktop on the same PC. Only the optional Web API source needs a Spotify Developer application. Never add a Client Secret: the app uses PKCE.
 
 ## Code and checks
 

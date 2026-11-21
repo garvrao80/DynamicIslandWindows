@@ -1,6 +1,6 @@
 {
   "name": "lyrics-island-windows",
-  "version": "0.1.1-beta.1",
+  "version": "0.1.1-beta.2",
   "description": "A floating Dynamic-Island-style Spotify lyrics notch for Windows.",
   "main": "src/main/main.js",
   "scripts": {
