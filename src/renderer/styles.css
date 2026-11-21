@@ -35,6 +35,7 @@ input {
 }
 
 .island {
+  cursor: grab;
   width: 308px;
   height: 63px;
   position: relative;
@@ -51,7 +52,7 @@ input {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     inset 0 -1px 0 rgba(255, 255, 255, 0.025);
-  -webkit-app-region: drag;
+  touch-action: none;
   flex: 0 0 auto;
   transition:
     width 300ms cubic-bezier(0.22, 0.72, 0.25, 1),
@@ -59,6 +60,9 @@ input {
     border-radius 300ms ease,
     box-shadow 360ms ease;
 }
+
+.island.is-dragging, .island.is-dragging * { cursor: grabbing !important; }
+.settings-popover { cursor: default; }
 
 .island.expanded-mode {
   box-shadow:
@@ -70,6 +74,46 @@ input {
   width: 100%;
   height: 100%;
   border-radius: clamp(24px, 5vw, 31px);
+  /* The notch path owns the corner morph; don't start a second radius
+     transition when handing the silhouette back to the normal glass. */
+  transition-property: width, height, box-shadow;
+}
+
+/* Keep the bloom inside the glass so the transparent window has no square halo. */
+#notchOutline { display: none; }
+.island.shaped {
+  border-radius: 0;
+  border-color: transparent;
+  box-shadow: none;
+  clip-path: var(--notch-path);
+}
+.island.shaped #notchOutline {
+  display: block;
+  position: absolute;
+  inset: -1px;
+  width: calc(100% + 2px);
+  height: calc(100% + 2px);
+  pointer-events: none;
+  z-index: 2;
+}
+
+#dockGlow {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  background: radial-gradient(ellipse 96px 32px at var(--dock-x, 50%) var(--dock-y, 50%),
+    rgba(166, 252, 219, .12), transparent);
+}
+#dockGlow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(188, 255, 236, .52);
+  mask-image: radial-gradient(ellipse 140px 85px at var(--dock-x) var(--dock-y), black 10%, transparent);
 }
 
 .compact {
@@ -84,7 +128,7 @@ input {
   width: 308px;
   height: 63px;
   padding: 7px 13px;
-  cursor: pointer;
+  cursor: grab;
   opacity: 1;
   transform: scale(1);
   will-change: opacity, transform;
@@ -92,11 +136,33 @@ input {
   transition:
     opacity 150ms ease 95ms,
     transform 180ms ease-out 90ms;
-  -webkit-app-region: drag;
 }
 
 .compact .controls {
   -webkit-app-region: no-drag;
+}
+
+.shaped:not(.expanded-mode) .compact {
+  /* Keep a gutter INSIDE the glass, including where side docking reduces
+     the height. A fixed 44px cover otherwise crowds the two curved edges. */
+  width: min(308px, 100%);
+  height: min(63px, 100%);
+  margin-left: 0;
+  translate: -50% 0;
+  grid-template-rows: minmax(0, 1fr);
+  padding: calc(6px + var(--notch-top)) calc(14px + var(--notch-right))
+           calc(6px + var(--notch-bottom)) calc(14px + var(--notch-left));
+}
+.shaped:not(.expanded-mode):not(.local-idle) .compact {
+  grid-template-columns: auto minmax(0, 1fr) max-content;
+  column-gap: 8px;
+}
+.shaped:not(.expanded-mode) .art {
+  width: auto;
+  height: min(44px, 100%);
+  aspect-ratio: 1;
+  justify-self: start;
+  border-radius: 32%;
 }
 
 .local-idle .compact { grid-template-columns: 52px minmax(0, 1fr); }
@@ -336,6 +402,38 @@ button:active {
   width: 17px;
   height: 17px;
 }
+
+.expanded-mode.shaped :is(.close-button, .resize-handle) {
+  right: calc(16px + var(--notch-right));
+}
+.expanded-mode.shaped .close-button {
+  top: calc(16px + var(--notch-top));
+}
+.expanded-mode.shaped .resize-handle {
+  bottom: calc(16px + var(--notch-bottom));
+}
+
+/* Lay out both columns inside the same animated body as the corner buttons.
+   Reserve height for two title lines, the artist, controls, progress and status
+   before sizing the square artwork. Docking never changes native bounds. */
+.expanded-mode.shaped .expanded {
+  --pad: clamp(12px, 3vw, 18px);
+  padding: calc(var(--pad) + var(--notch-top)) calc(var(--pad) + var(--notch-right))
+           calc(var(--pad) + var(--notch-bottom)) calc(var(--pad) + var(--notch-left));
+}
+.expanded-mode.shaped .expanded-grid {
+  container-type: size;
+  grid-template-rows: minmax(0, 1fr);
+}
+.expanded-mode.shaped .now-playing {
+  --cover-size: min(20vw, max(0px, calc(100cqh - 134px)), 126px);
+  grid-template-rows: var(--cover-size) minmax(42px, auto) 40px 18px 16px;
+}
+.expanded-mode.shaped .expanded-art {
+  width: var(--cover-size);
+  height: var(--cover-size);
+}
+.expanded-mode.shaped .lyrics-window { max-height: 100cqh; }
 
 .resize-handle:hover,
 .resize-handle.resizing {
@@ -624,7 +722,9 @@ input {
   min-width: 0;
 }
 
-#playbackSource {
+#settingsMessage:empty { display: none; }
+#settingsMessage { font-size: 12px; }
+#playbackSource, #shortcut {
   min-width: 0;
   background: #222;
   color: inherit;

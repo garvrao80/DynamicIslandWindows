@@ -1,13 +1,13 @@
-# Lyrics Island v0.1.1-beta.2
+# Lyrics Island v0.1.1-beta.3
 
 Play a song in Spotify desktop on this PC and the island picks it up through Windows media sessions. Fresh installations use this source automatically. After upgrading, select **Settings → Spotify on this PC → Save** to switch an existing profile. For playback on another device, choose **Spotify Web API** to see the Client ID and connection controls.
 
 ## What's new
 
-- Skip buttons give immediate feedback. The title updates when the player confirms a track, its cover fades in, and lyrics load independently. Rapid skips discard late responses from earlier songs.
-- The pill expands and collapses smoothly, including when you reopen it during collapse.
-- Expanded lyrics follow faster passages with shorter slides. **Back to live** returns to the current line while browsing.
-- Adjust a song’s timing in 250 ms steps in Settings. Each correction is saved for that song and also applies when seeking by lyric.
+- Optional magnetic docking in both views: release near a screen edge or corner for a curved attachment and a brief glow. Reduced motion is respected.
+- Docked layouts keep artwork, lyrics and playback controls inside the glass. The compact cover adapts to the available height at side attachments.
+- Drag from the artwork, text or playback buttons. Both views stay on screen, retain the expanded size, and remember placement per monitor.
+- Choose a global show/hide shortcut in Settings, or import a local synced LRC for the current song. Imported lyrics persist after restart and support lyric seeking and timing adjustments.
 
 ## Windows downloads
 

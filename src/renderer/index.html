@@ -12,6 +12,8 @@
   </head>
   <body>
     <main id="island" class="island" aria-label="Lyrics Island">
+      <svg id="notchOutline" aria-hidden="true"><path fill="none" stroke="rgba(245,255,251,.15)" /></svg>
+      <div id="dockGlow" aria-hidden="true"></div>
       <section class="compact">
         <div id="art" class="art"></div>
         <div class="meta">
@@ -92,6 +94,22 @@
             <button type="button" data-timing="late" title="Advance this song’s lyrics by 250 ms">Lyrics late</button>
             <button type="button" data-timing="reset" aria-label="Reset this song’s timing">Reset</button>
           </div>
+          <div class="settings-row">
+            <label>Show/hide shortcut
+              <select id="shortcut">
+                <option value="">Off</option>
+                <option>Ctrl+Alt+L</option>
+                <option>Ctrl+Shift+F9</option>
+                <option>Alt+Shift+I</option>
+              </select>
+            </label>
+            <label class="toggle"><input type="checkbox" id="snapEdges" /> Snap to edges</label>
+          </div>
+          <div class="settings-actions">
+            <button type="button" id="importLrc">Import .lrc for song</button>
+            <button type="button" id="removeLrc" hidden>Use automatic lyrics</button>
+          </div>
+          <output id="settingsMessage" aria-live="polite"></output>
           <div class="settings-actions">
             <button hidden id="dashboard" type="button">Dashboard</button>
             <button hidden id="connect" type="button">Connect</button>
@@ -102,5 +120,6 @@
     </main>
 
     <script src="./renderer.js"></script>
+    <script src="./notch.js"></script>
   </body>
 </html>

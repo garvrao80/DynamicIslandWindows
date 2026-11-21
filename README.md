@@ -4,7 +4,7 @@ Lyrics Island is a lightweight, floating music controller for Windows. It puts t
 
 This is an open-source Electron app inspired by the macOS LyricsNotch concept and rebuilt with Windows-friendly primitives.
 
-**Windows beta — contributors welcome.** [Download v0.1.1-beta.2](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.2) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Report a bug](https://github.com/garvrao80/DynamicIslandWindows/issues/new/choose)
+**Windows beta — contributors welcome.** [Download v0.1.1-beta.3](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.3) · [Contribute](CONTRIBUTING.md) · [Roadmap](ROADMAP.md) · [Report a bug](https://github.com/garvrao80/DynamicIslandWindows/issues/new/choose)
 
 ## Features
 
@@ -14,9 +14,18 @@ This is an open-source Electron app inspired by the macOS LyricsNotch concept an
 - Spotify OAuth 2.0 Authorization Code with PKCE
 - Demo mode for trying the interface without Spotify
 - Draggable compact and expanded layouts
+- Both views stop at the usable screen edge while you drag, even with snapping turned off. Move the pointer onto another monitor to carry the whole island across.
 - Tray menu, single-instance protection, and optional launch at login
 - Adjustable lyric timing offset and island opacity
 - Windows portable and installer builds
+
+**New in beta.3:**
+
+- **Show/hide without switching apps:** in expanded Settings, choose a global shortcut and click Save. Off by default. If another app owns the combination, select a different one. The tray can always bring the island back.
+- **Bring your own synced lyrics:** while a track plays, open Settings → **Import .lrc for song** and choose a UTF-8 timestamped LRC. The island keeps a local copy for that track and playback source, including after restart. Scrolling, click-to-seek and timing corrections work as with online lyrics. Choose **Use automatic lyrics** to remove the copy and return to LRCLIB.
+- **Monitor placement:** enable **Snap to edges**, then release the island within 36 Windows display units of an edge or corner. Both views form curved shoulders where they meet the screen, scaled to fit the compact pill or expanded island. Artwork and controls stay inside the outline. Pull the island away to restore its floating shape. A mint light marks the landing; Windows reduced motion skips the animations. Use the tray’s **Move to monitor** menu to return to a display’s remembered spot.
+
+To check a source build, run `npm test` for the lyrics and placement tests and `npm run test:desktop` for a Windows Electron smoke test. The desktop test uses sample tracks and a temporary profile; it does not seek or skip your music.
 
 ## Requirements
 
@@ -31,8 +40,8 @@ On Windows 10 (1809+) or Windows 11, start Spotify desktop and play a track on t
 
 ### Download a Windows build
 
-1. Open the [beta release](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.2).
-2. Download **LyricsIsland-Setup-0.1.1-beta.2-x64.exe** to install, or **LyricsIsland-Portable-0.1.1-beta.2-x64.exe** to run without installation. Neither needs Node.js or a terminal.
+1. Open the [beta release](https://github.com/garvrao80/DynamicIslandWindows/releases/tag/v0.1.1-beta.3).
+2. Download **LyricsIsland-Setup-0.1.1-beta.3-x64.exe** to install, or **LyricsIsland-Portable-0.1.1-beta.3-x64.exe** to run without installation. Neither needs Node.js or a terminal.
 3. Quit any older Lyrics Island instance from its tray menu, then launch the downloaded app. The installer creates Windows shortcuts.
 4. Play a song in the Spotify desktop app. Double-click the pill to browse lyrics. If upgrading from the previous beta, choose **Settings → Spotify on this PC → Save** to use local playback.
 
@@ -115,7 +124,7 @@ Spotify Web API playback control requires an active Spotify Premium account. If 
 A fresh local profile prompts you to play a song in Spotify. Select **Spotify Web API** in Settings to reveal its Client ID and connection controls. On track changes, the island shows the confirmed title immediately, loads its cover, and displays **Finding lyrics…** until the lookup finishes.
 
 - Double-click the compact pill to expand it.
-- Drag the pill from the artwork or track information area.
+- Drag either view from the artwork, title, lyrics, or playback buttons. A click still activates a button or seeks to a timed lyric; dragging it moves the island instead. The progress bar, resize handle, and settings form keep their own gestures.
 - In expanded mode, drag the bottom-right resize button to change the island size. The last expanded size is reused when you collapse and expand it again during the session.
 - In expanded mode, scroll over the lyrics to browse manually. When playback is active, the lyrics return to the current line after about two seconds without scrolling.
 - Click any synced lyric line in expanded mode to seek Spotify directly to that part of the song.

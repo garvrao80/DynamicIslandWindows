@@ -28,12 +28,27 @@ const lyricsWindow = document.querySelector(".lyrics-window");
 const backToLive = document.getElementById("backToLive");
 const songTiming = document.getElementById("songTiming");
 const timingButtons = settings.querySelectorAll("[data-timing]");
+const shortcut = document.getElementById("shortcut");
+const snapEdges = document.getElementById("snapEdges");
+const importLrc = document.getElementById("importLrc");
+const removeLrc = document.getElementById("removeLrc");
+const settingsMessage = document.getElementById("settingsMessage");
 
 let expanded = false;
 let currentState = null;
 let requestedArtwork;
 let artworkVersion = 0;
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const dockGlow = document.getElementById("dockGlow");
+window.lyricsIsland.onDocked(({ horizontal, vertical }) => {
+  if (reducedMotion.matches) return;
+  dockGlow.style.setProperty("--dock-x", horizontal === "left" ? "0%" : horizontal === "right" ? "100%" : "50%");
+  dockGlow.style.setProperty("--dock-y", vertical === "top" ? "0%" : vertical === "bottom" ? "100%" : "50%");
+  for (const animation of dockGlow.getAnimations()) animation.cancel();
+  dockGlow.animate([{opacity: 0}, {opacity: 1, offset: .16}, {opacity: 0}], {
+    duration: 900, easing: "ease-out"
+  });
+});
 let transitionVersion = 0;
 let lastLyricsKey = "";
 let playbackSampledAt = 0;
@@ -375,6 +390,17 @@ function render(state) {
   const correction = state.config?.songOffsetMs || 0;
   songTiming.textContent = "Song: " + (correction > 0 ? "+" : "") + correction + " ms";
   for (const button of timingButtons) button.disabled = !playback.uri || !state.lyrics?.synced?.length;
+  importLrc.disabled = !playback.uri || state.config?.demoMode;
+  removeLrc.hidden = state.lyrics?.source !== "Local LRC";
+  const binding = state.config?.toggleShortcut || "";
+  if (shortcut.dataset.saved !== binding) {
+    shortcut.value = shortcut.dataset.saved = binding;
+  }
+  const snapping = Boolean(state.config?.snapEdges);
+  if (snapEdges.dataset.saved !== String(snapping)) {
+    snapEdges.checked = snapping;
+    snapEdges.dataset.saved = String(snapping);
+  }
   const title = playback.track || "Lyrics Island";
   const artist = playback.artist || "Windows floating lyrics";
 
@@ -435,6 +461,52 @@ async function setExpanded(nextExpanded) {
   }
 }
 
+let dragPointer = null;
+let dragFrame = 0;
+let dragOrigin, dragging = false, suppressDragClick = false;
+function recognizeDrag(event) {
+  // Until committed the window is stationary, so client coordinates are stable.
+  if (!dragging && Math.hypot(event.clientX - dragOrigin.x, event.clientY - dragOrigin.y) >= 5) {
+    dragging = true;
+    island.classList.add("is-dragging");
+  }
+}
+island.addEventListener("pointerdown", event => {
+  if (event.button !== 0 || !event.isPrimary || dragPointer !== null) return;
+  // Only controls that own a press-and-drag gesture need exclusive space.
+  if (event.target.closest("form, .progress-track, #resizeHandle")) return;
+  dragPointer = event.pointerId;
+  dragOrigin = {x:event.clientX, y:event.clientY};
+  dragging = false;
+  (event.target.closest("button, .lyric-line") || event.target).setPointerCapture(event.pointerId);
+  void window.lyricsIsland.drag("start", {x: event.clientX, y: event.clientY});
+});
+island.addEventListener("pointermove", event => {
+  if (event.pointerId !== dragPointer) return;
+  recognizeDrag(event);
+  if (!dragging || dragFrame) return;
+  dragFrame = requestAnimationFrame(() => { dragFrame = 0; void window.lyricsIsland.drag("move"); });
+});
+function finishDrag(event) {
+  if (event.pointerId !== dragPointer) return;
+  if (event.type === "pointerup") recognizeDrag(event);
+  suppressDragClick = dragging;
+  island.classList.remove("is-dragging");
+  dragPointer = null;
+  cancelAnimationFrame(dragFrame);
+  dragFrame = 0;
+  void window.lyricsIsland.drag(dragging && event.type === "pointerup" ? "end" : "cancel");
+}
+for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) document.addEventListener(type, finishDrag);
+for (const type of ["click", "dblclick"]) island.addEventListener(type, event => {
+  // Keyboard activation has detail 0; a completed drag must never swallow it.
+  if (!suppressDragClick || !event.detail) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}, true);
+// Reset even when a dedicated resize or seek handler stops pointerdown bubbling.
+island.addEventListener("pointerdown", () => { suppressDragClick = false; }, true);
+
 compact.addEventListener("dblclick", (event) => {
   if (event.target.closest("button")) return;
   setExpanded(true);
@@ -490,7 +562,19 @@ function updateWebFields() {
   for (const control of [clientId, dashboard, connect]) control.hidden = hide;
 }
 playbackSource.addEventListener("change", updateWebFields);
-settingsToggle.addEventListener("click", () => island.classList.toggle("settings-open"));
+settingsToggle.addEventListener("click", () => {
+  island.classList.toggle("settings-open");
+  settingsMessage.textContent = currentState?.config?.shortcutUnavailable ? "Saved shortcut is in use. Choose another." : "";
+});
+function settingsError(error) {
+  settingsMessage.textContent = String(error.message || error).replace(/^Error invoking remote method '[^']+': (?:Error: )?/, "");
+}
+for (const [button, action] of [[importLrc, "import"], [removeLrc, "remove"]]) {
+  button.addEventListener("click", async () => {
+    try { settingsMessage.textContent = await window.lyricsIsland.localLyrics(currentState.playback?.uri, action); }
+    catch (error) { settingsError(error); }
+  });
+}
 backToLive.addEventListener("click", returnToActiveLyrics);
 for (const button of timingButtons) {
   button.addEventListener("click", () => window.lyricsIsland.adjustTiming(currentState.playback.uri, button.dataset.timing));
@@ -503,14 +587,16 @@ opacityInput.addEventListener("input", (event) => {
 
 settings.addEventListener("submit", async (event) => {
   event.preventDefault();
-  await window.lyricsIsland.saveConfig({
+  try { await window.lyricsIsland.saveConfig({
+    toggleShortcut: shortcut.value,
+    snapEdges: snapEdges.checked,
     ...(playbackSource.value === "web" ? { spotifyClientId: clientId.value.trim() } : {}),
     demoMode: playbackSource.value === "demo",
     windowsMedia: playbackSource.value === "windows",
     startAtLogin: startAtLogin.checked,
     lyricOffsetMs: Number(offset.value || 0),
     opacity: Number(opacityInput.value || 100)
-  });
+  }); } catch (error) { settingsError(error); return; }
   island.classList.remove("settings-open");
 });
 

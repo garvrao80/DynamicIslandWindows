@@ -1,4 +1,7 @@
-const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell, globalShortcut, dialog, systemPreferences } = require("electron");
+const { compactSize, contain, remember, restore, snap, snapProgress } = require("./placement");
+const { prepareLights } = require("./edgeLight");
+const { loadFile, storeOverride, readOverride, removeOverride } = require("./localLyrics");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { readConfig, writeConfig } = require("./config");
@@ -27,6 +30,14 @@ let config;
 let timer;
 let windowExpanded = false;
 let preferenceSaveTimer;
+let snapTimer;
+let dragSession;
+let edgeLights;
+let edgeLightTimer;
+let registeredShortcut = "";
+let editingOverride = false;
+const shortcuts = ["", "Ctrl+Alt+L", "Ctrl+Shift+F9", "Alt+Shift+I"];
+const localFolder = () => path.join(app.getPath("userData"), "local-lyrics");
 let lastTrackKey = "";
 let playbackRequest = 0;
 let latestAppliedRequest = 0;
@@ -94,6 +105,8 @@ function lyricsCacheKey(playback) {
 }
 
 async function lyricsForPlayback(playback) {
+  const override = await readOverride(localFolder(), playback.uri);
+  if (override) return override;
   const cacheKey = lyricsCacheKey(playback);
   if (cacheKey && lyricsCache.get(cacheKey)?.lyrics.synced?.length) {
     const cachedEntry = lyricsCache.get(cacheKey);
@@ -132,6 +145,9 @@ function publicConfig(playback) {
     songOffsetMs: songOffset(playback?.uri),
     pollIntervalMs: config.pollIntervalMs,
     startAtLogin: config.startAtLogin,
+    toggleShortcut: registeredShortcut,
+    shortcutUnavailable: Boolean(config.toggleShortcut && !registeredShortcut),
+    snapEdges: config.snapEdges,
     position: config.position,
     demoMode: config.demoMode,
     windowsMedia: config.windowsMedia,
@@ -188,6 +204,7 @@ function validateConfigUpdate(nextConfig) {
   }
 
   const allowedKeys = new Set([
+    "toggleShortcut", "snapEdges",
     "spotifyClientId",
     "demoMode",
     "windowsMedia",
@@ -200,6 +217,14 @@ function validateConfigUpdate(nextConfig) {
   }
 
   const update = {};
+  if (Object.hasOwn(nextConfig, "snapEdges")) {
+    if (typeof nextConfig.snapEdges !== "boolean") throw new TypeError("Invalid snapping preference");
+    update.snapEdges = nextConfig.snapEdges;
+  }
+  if (Object.hasOwn(nextConfig, "toggleShortcut")) {
+    if (!shortcuts.includes(nextConfig.toggleShortcut)) throw new TypeError("Unsupported shortcut");
+    update.toggleShortcut = nextConfig.toggleShortcut;
+  }
   if (Object.hasOwn(nextConfig, "windowsMedia")) {
     if (typeof nextConfig.windowsMedia !== "boolean") throw new TypeError("Invalid playback source");
     update.windowsMedia = nextConfig.windowsMedia;
@@ -234,42 +259,101 @@ function validateConfigUpdate(nextConfig) {
   return update;
 }
 
-function targetBounds(expanded = false, anchorBounds = null) {
-  const display = anchorBounds ? screen.getDisplayMatching(anchorBounds) : screen.getPrimaryDisplay();
-  const { x, y, width, height } = display.workArea;
+function targetBounds(expanded = false, anchorBounds = null, destination = null) {
+  const legacy = config.windowPosition;
+  const display = destination || (anchorBounds ? screen.getDisplayMatching(anchorBounds) :
+    screen.getAllDisplays().find(d => d.id === config.lastDisplayId) ||
+    (config.lastDisplayId == null && Number.isFinite(legacy?.x) && Number.isFinite(legacy?.y)
+      ? screen.getDisplayMatching({ ...compactSize, x: legacy.x, y: legacy.y }) : screen.getPrimaryDisplay()));
+  const { width, height } = display.workArea;
   const size = expanded
     ? {
         width: clamp(expandedSize.width, expandedMinSize.width, width),
         height: clamp(expandedSize.height, expandedMinSize.height, height)
       }
-    : { width: 308, height: 63 };
-  const savedPosition = config?.windowPosition;
-  const savedLeft = Number(savedPosition?.x);
-  const savedTop = Number(savedPosition?.y);
-  const centerX = anchorBounds ? anchorBounds.x + anchorBounds.width / 2 : x + width / 2;
-  const top = anchorBounds
-    ? anchorBounds.y
-    : Number.isFinite(savedTop)
-      ? savedTop
-      : y + 18;
-  const left = Math.round(clamp(
-    anchorBounds
-      ? centerX - size.width / 2
-      : Number.isFinite(savedLeft)
-        ? savedLeft
-        : centerX - size.width / 2,
-    x,
-    x + width - size.width
-  ));
-  const clampedTop = Math.round(clamp(top, y, y + height - size.height));
+    : compactSize;
+  const saved = config.monitorPositions?.[display.id] ??
+    (!destination && config.lastDisplayId == null && legacy ? remember({ ...legacy, ...compactSize }, display.workArea) : null);
+  return restore(size, display.workArea, anchorBounds ? remember(anchorBounds, display.workArea) : saved);
+}
 
-  return { x: left, y: clampedTop, ...size };
+let lastContact = "";
+function syncContact(bounds) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const area = bounds && config.snapEdges && screen.getDisplayMatching(bounds).workArea;
+  const edges = area ? [
+    Math.abs(bounds.x - area.x) <= 1 && "left",
+    Math.abs(bounds.y - area.y) <= 1 && "top",
+    Math.abs(bounds.x + bounds.width - area.x - area.width) <= 1 && "right",
+    Math.abs(bounds.y + bounds.height - area.y - area.height) <= 1 && "bottom"
+  ].filter(Boolean) : [];
+  const key = edges.join(" ");
+  if (key === lastContact) return;
+  lastContact = key;
+  mainWindow.webContents.send("island:contact", edges);
+}
+
+function cancelSnap() {
+  clearTimeout(snapTimer);
+  snapTimer = undefined;
+  clearTimeout(edgeLightTimer);
+  edgeLights?.close();
+  edgeLights = null;
+}
+
+function dockAfterDrag(win) {
+  cancelSnap();
+  const observed = win.getBounds();
+  const display = screen.getDisplayMatching(observed);
+  const area = display.workArea;
+  // setPosition round-trips the native width through integer DIPs each frame.
+  // At fractional scaling that accumulates. Move a fixed logical rectangle instead.
+  const intended = windowExpanded ? expandedSize : compactSize;
+  const from = { ...observed, width: Math.min(intended.width, area.width), height: Math.min(intended.height, area.height) };
+  const to = snap(from, area);
+  const horizontal = to.x === area.x ? "left" : to.x + to.width === area.x + area.width ? "right" : "";
+  const vertical = to.y === area.y ? "top" : to.y + to.height === area.y + area.height ? "bottom" : "";
+  if (!horizontal && !vertical) { syncContact(null); return; }
+  const dx = to.x - from.x, dy = to.y - from.y;
+  const distance = Math.hypot(dx, dy);
+  if (systemPreferences.getAnimationSettings().prefersReducedMotion) {
+    if (distance) win.setBounds(to, false);
+    syncContact(to);
+    return;
+  }
+  const duration = Math.min(420, 200 + distance * 4);
+  edgeLights = prepareLights([horizontal, vertical], to, display.bounds);
+  const start = performance.now();
+  let lastX = from.x, lastY = from.y;
+  function tick() {
+    if (win.isDestroyed()) return;
+    const time = distance ? (performance.now() - start) / duration : 1;
+    const progress = snapProgress(time);
+    const x = Math.round(from.x + progress * dx), y = Math.round(from.y + progress * dy);
+    if (x !== lastX || y !== lastY) {
+      win.setBounds({ ...from, x, y }, false);
+      lastX = x; lastY = y;
+    }
+    if (time < 1) snapTimer = setTimeout(tick, 16);
+    else {
+      snapTimer = undefined;
+      syncContact(to);
+      win.webContents.send("island:docked", { horizontal, vertical });
+      edgeLights?.reveal();
+      edgeLightTimer = setTimeout(() => { edgeLights?.close(); edgeLights = null; }, 1100);
+      schedulePreferenceSave();
+    }
+  }
+  tick();
 }
 
 function setWindowBounds(expanded = false, preservePosition = true) {
+  dragSession = null;
+  cancelSnap();
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const target = targetBounds(expanded, preservePosition ? mainWindow.getBounds() : null);
   mainWindow.setBounds(target, false);
+  syncContact(target);
 }
 
 function createWindow() {
@@ -280,6 +364,7 @@ function createWindow() {
     transparent: true,
     backgroundColor: "#00000000",
     resizable: false,
+    maximizable: false,
     movable: true,
     show: false,
     alwaysOnTop: true,
@@ -298,6 +383,22 @@ function createWindow() {
   mainWindow.setBackgroundColor("#00000000");
   mainWindow.setAlwaysOnTop(true, "screen-saver");
   mainWindow.on("move", schedulePreferenceSave);
+  let dragging = false;
+  mainWindow.on("will-move", (event, proposed) => {
+    cancelSnap(); dragging = true; syncContact(null);
+    // Native/system-menu moves don't use our captured pointer path.
+    const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+    const bounded = contain(proposed, area);
+    if (bounded.x !== proposed.x || bounded.y !== proposed.y) event.preventDefault();
+  });
+  mainWindow.on("hide", () => { dragSession = null; cancelSnap(); });
+  mainWindow.on("closed", cancelSnap);
+  mainWindow.on("moved", () => {
+    if (!dragging) return;
+    dragging = false;
+    if (!config.snapEdges) return;
+    dockAfterDrag(mainWindow);
+  });
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   mainWindow.webContents.on("will-navigate", (event, navigationUrl) => {
     if (navigationUrl !== trustedRendererUrl) event.preventDefault();
@@ -308,29 +409,67 @@ function createWindow() {
   mainWindow.webContents.on("will-attach-webview", (event) => event.preventDefault());
   mainWindow.loadFile(rendererPath);
   setWindowBounds(false, false);
+  mainWindow.webContents.on("did-finish-load", () => {
+    lastContact = "";
+    syncContact(mainWindow.getBounds());
+  });
   mainWindow.once("ready-to-show", () => mainWindow.show());
 }
 
 function schedulePreferenceSave() {
   clearTimeout(preferenceSaveTimer);
-  preferenceSaveTimer = setTimeout(() => {
-    if (!mainWindow || mainWindow.isDestroyed() || !config) return;
-    const bounds = mainWindow.getBounds();
-    config = writeConfig({
-      ...config,
-      windowPosition: { x: bounds.x, y: bounds.y },
-      expandedSize
-    });
-  }, 500);
+  preferenceSaveTimer = setTimeout(savePlacement, 500);
+}
+
+function savePlacement() {
+  if (!mainWindow || mainWindow.isDestroyed() || !config) return;
+  const bounds = mainWindow.getBounds();
+  const display = screen.getDisplayMatching(bounds);
+  config = writeConfig({
+    ...config,
+    lastDisplayId: display.id,
+    monitorPositions: { ...config.monitorPositions, [display.id]: remember(bounds, display.workArea) },
+    windowPosition: { x: bounds.x, y: bounds.y },
+    expandedSize
+  });
+}
+
+function bindShortcut(next) {
+  if (registeredShortcut === next) return true;
+  if (next && !globalShortcut.register(next, () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isVisible()) mainWindow.hide();
+      else mainWindow.showInactive();
+    }
+  })) return false;
+  if (registeredShortcut) globalShortcut.unregister(registeredShortcut);
+  registeredShortcut = next;
+  return true;
 }
 
 function createTray() {
   tray = new Tray(createIcon());
   tray.setToolTip("Lyrics Island");
+  updateTray();
+}
+
+function updateTray() {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: "Show island", click: () => mainWindow?.show() },
       { label: "Hide island", click: () => mainWindow?.hide() },
+      { label: "Move to monitor", submenu: screen.getAllDisplays().map((display, i) => ({
+        label: display.label || "Monitor " + (i + 1),
+        click: () => {
+          cancelSnap();
+          savePlacement();
+          const target = targetBounds(windowExpanded, null, display);
+          mainWindow.setBounds(target, false);
+          syncContact(target);
+          schedulePreferenceSave();
+          mainWindow.showInactive();
+        }
+      })) },
       {
         label: "Demo mode",
         type: "checkbox",
@@ -603,6 +742,19 @@ app.whenReady().then(() => {
 
   createWindow();
   createTray();
+  screen.on("display-added", updateTray);
+  screen.on("display-metrics-changed", (_event, display, metrics) => {
+    if (!metrics.some(key => ["workArea", "bounds", "scaleFactor"].includes(key))) return;
+    if (screen.getDisplayMatching(mainWindow.getBounds()).id === display.id) setWindowBounds(windowExpanded);
+  });
+  screen.on("display-removed", () => {
+    cancelSnap();
+    const target = targetBounds(windowExpanded);
+    mainWindow.setBounds(target, false);
+    syncContact(target);
+    updateTray();
+  });
+  if (shortcuts.includes(config.toggleShortcut)) bindShortcut(config.toggleShortcut);
   publishState({ status: "Ready" });
   startLoop();
 });
@@ -612,17 +764,12 @@ app.on("window-all-closed", (event) => {
 });
 
 app.on("before-quit", () => {
+  cancelSnap();
+  if (registeredShortcut) globalShortcut.unregister(registeredShortcut);
   closeWindowsMedia();
   clearInterval(timer);
   clearTimeout(preferenceSaveTimer);
-  if (mainWindow && !mainWindow.isDestroyed() && config) {
-    const bounds = mainWindow.getBounds();
-    writeConfig({
-      ...config,
-      windowPosition: { x: bounds.x, y: bounds.y },
-      expandedSize
-    });
-  }
+  savePlacement();
 });
 
 ipcMain.handle("state:get", (event) => {
@@ -633,10 +780,13 @@ ipcMain.handle("state:get", (event) => {
 ipcMain.handle("config:save", (event, nextConfig) => {
   assertTrustedRenderer(event);
   const update = validateConfigUpdate(nextConfig);
+  if (update.toggleShortcut !== undefined && !bindShortcut(update.toggleShortcut))
+    throw new Error("That shortcut is in use. Choose another.");
   const leavingDemo = config.demoMode && update.demoMode === false;
   const enteringDemo = !config.demoMode && update.demoMode === true;
   const switchingSource = update.windowsMedia !== undefined && update.windowsMedia !== config.windowsMedia;
   config = writeConfig({ ...config, ...update });
+  if (!config.snapEdges) { cancelSnap(); syncContact(null); }
   if (leavingDemo || enteringDemo || switchingSource) {
     closeWindowsMedia();
     rateLimitUntil = 0;
@@ -650,6 +800,39 @@ ipcMain.handle("config:save", (event, nextConfig) => {
   startLoop();
   publishState({ status: "Settings saved" });
   return state;
+});
+
+ipcMain.handle("lyrics:local", async (event, uri, action) => {
+  assertTrustedRenderer(event);
+  const sameSong = () => typeof uri === "string" && uri && uri === state.playback?.uri && !config.demoMode;
+  if (!sameSong()) throw new Error("Play the song before changing its lyrics.");
+  if (editingOverride || !["import", "remove"].includes(action)) throw new Error("Cannot change lyrics right now.");
+  editingOverride = true;
+  try {
+    let lyrics;
+    if (action === "import") {
+      const choice = await dialog.showOpenDialog(mainWindow, {
+        title: "Choose synced lyrics for " + state.playback.track, properties: ["openFile"],
+        filters: [{ name: "Synced lyrics", extensions: ["lrc"] }]
+      });
+      if (choice.canceled) return "";
+      const file = await loadFile(choice.filePaths[0]);
+      if (!sameSong()) throw new Error("Song changed. Open the file again for the new song.");
+      await storeOverride(localFolder(), uri, file.raw);
+      lyrics = file.lyrics;
+    } else {
+      await removeOverride(localFolder(), uri);
+      lyrics = { source: "loading", synced: [], plain: "" };
+    }
+    if (sameSong()) {
+      const playback = estimatedPlayback();
+      currentLyrics = lyrics; // Invalidate any outstanding automatic lookup for this track.
+      lastPlaybackRefreshAt = Date.now();
+      publishState({ playback, lyrics, activeLyricIndex: activeLyricIndex(playback, lyrics) });
+      if (action === "remove") void completeLyricsLookup(playback, lyrics);
+    }
+    return action === "import" ? "Local lyrics saved for this song." : "Automatic lyrics restored.";
+  } finally { editingOverride = false; }
 });
 
 ipcMain.handle("lyrics:adjust-timing", (event, uri, action) => {
@@ -811,6 +994,35 @@ ipcMain.handle("island:expanded", (event, expanded) => {
   return true;
 });
 
+ipcMain.handle("island:drag", (event, phase, grip) => {
+  assertTrustedRenderer(event);
+  if (phase === "cancel") { dragSession = null; return; }
+  const point = screen.getCursorScreenPoint();
+  if (phase === "start") {
+    const bounds = mainWindow.getBounds();
+    if (!grip || !Number.isFinite(grip.x) || !Number.isFinite(grip.y)) return;
+    cancelSnap();
+    dragSession = { grip: { x: clamp(Math.round(grip.x), 0, bounds.width),
+      y: clamp(Math.round(grip.y), 0, bounds.height) }, start: point, moved: false };
+    return;
+  }
+  if (!dragSession || !["move", "end"].includes(phase)) return;
+  const drag = dragSession;
+  if (phase === "end") dragSession = null;
+  if (!drag.moved && Math.hypot(point.x - drag.start.x, point.y - drag.start.y) < 3) return;
+  drag.moved = true;
+  syncContact(null);
+  // The cursor chooses the destination so clamping never traps a drag at a monitor seam.
+  const area = screen.getDisplayNearestPoint(point).workArea;
+  const next = contain({ ...(windowExpanded ? expandedSize : compactSize),
+    x: point.x - drag.grip.x, y: point.y - drag.grip.y }, area);
+  if (!drag.last || ["x", "y", "width", "height"].some(k => next[k] !== drag.last[k])) {
+    mainWindow.setBounds(next, false);
+    drag.last = next;
+  }
+  if (phase === "end" && config.snapEdges) dockAfterDrag(mainWindow);
+});
+
 ipcMain.handle("island:resize-expanded", (event, requestedSize) => {
   assertTrustedRenderer(event);
   if (!mainWindow || mainWindow.isDestroyed()) return null;
@@ -846,7 +1058,9 @@ ipcMain.handle("island:resize-expanded", (event, requestedSize) => {
   ));
 
   expandedSize = { width, height };
+  cancelSnap();
   mainWindow.setBounds({ x: current.x, y: current.y, width, height }, false);
+  syncContact({ x: current.x, y: current.y, width, height });
   schedulePreferenceSave();
   return { width, height };
 });

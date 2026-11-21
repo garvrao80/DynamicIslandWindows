@@ -14,23 +14,18 @@ function parseRetryAfterMs(value) {
 function parseSyncedLyrics(raw) {
   if (!raw) return [];
 
-  return raw
-    .split(/\r?\n/)
-    .map((line) => {
-      const match = line.match(/^\[(\d{2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$/);
-      if (!match) return null;
-
-      const minutes = Number(match[1]);
-      const seconds = Number(match[2]);
-      const fraction = Number((match[3] || "0").padEnd(3, "0"));
-
-      return {
-        timeMs: minutes * 60_000 + seconds * 1000 + fraction,
-        text: match[4].trim()
-      };
-    })
-    .filter((line) => line && line.text)
-    .sort((a, b) => a.timeMs - b.timeMs);
+  const offset = Number(raw.match(/^\s*\[offset:\s*([+-]?\d{1,7})\s*\]/im)?.[1] || 0);
+  const lines = [];
+  for (const row of raw.split(/\r?\n/)) {
+    const match = row.trim().match(/^((?:\[\d{1,3}:[0-5]\d(?:\.\d{1,3})?\])+)(.+)$/);
+    const text = match?.[2].trim();
+    if (!text || text.startsWith("[") && /^\[\d+:/.test(text)) continue;
+    for (const stamp of match[1].matchAll(/\[(\d+):(\d+)(?:\.(\d+))?\]/g)) {
+      const time = Number(stamp[1])*60000 + Number(stamp[2])*1000 + Number((stamp[3] || "").padEnd(3, "0"));
+      lines.push({ timeMs: Math.max(0, time - offset), text });
+    }
+  }
+  return lines.sort((a, b) => a.timeMs - b.timeMs);
 }
 
 function normalizeKey(track, artist, album, durationMs) {
