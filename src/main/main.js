@@ -1,6 +1,8 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage, screen, shell, globalShortcut, dialog, systemPreferences } = require("electron");
 const { compactSize, contain, remember, restore, snap, snapProgress } = require("./placement");
 const { prepareLights } = require("./edgeLight");
+const findCover = require("./artwork").createCoverLookup();
+const { sample, releaseGlide, throwTarget } = require("./momentum");
 const { loadFile, storeOverride, readOverride, removeOverride } = require("./localLyrics");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -301,7 +303,33 @@ function cancelSnap() {
   edgeLights = null;
 }
 
-function dockAfterDrag(win) {
+// Share the cancellable window-motion timer with docking: grabbing, hiding,
+// resizing, switching monitors or quitting interrupts either animation.
+function finishPointerDrag(win, from, area, samples) {
+  const glide = !systemPreferences.getAnimationSettings().prefersReducedMotion && releaseGlide(samples);
+  const target = config.snapEdges && throwTarget(from, area, glide);
+  const settle = () => { if (config.snapEdges) dockAfterDrag(win, target); else schedulePreferenceSave(); };
+  if (!glide) { settle(); return; }
+  const dx = target ? target.x - from.x : glide.dx;
+  const dy = target ? target.y - from.y : glide.dy;
+  const duration = target ? Math.min(430, Math.max(glide.duration, 2.5 * Math.hypot(dx,dy) / glide.speed)) : glide.duration;
+  const start = performance.now();
+  let last = from;
+  function tick() {
+    if (win.isDestroyed()) return;
+    const t = Math.min(1, (performance.now() - start) / duration);
+    const eased = 1 - (1 - t) ** 3;
+    const next = contain({ ...from, x: Math.round(from.x + dx * eased),
+      y: Math.round(from.y + dy * eased) }, area);
+    if (next.x !== last.x || next.y !== last.y) win.setBounds(next, false);
+    last = next;
+    if (t < 1) snapTimer = setTimeout(tick, 16);
+    else { snapTimer = undefined; settle(); }
+  }
+  tick();
+}
+
+function dockAfterDrag(win, throwLanding = null) {
   cancelSnap();
   const observed = win.getBounds();
   const display = screen.getDisplayMatching(observed);
@@ -310,7 +338,7 @@ function dockAfterDrag(win) {
   // At fractional scaling that accumulates. Move a fixed logical rectangle instead.
   const intended = windowExpanded ? expandedSize : compactSize;
   const from = { ...observed, width: Math.min(intended.width, area.width), height: Math.min(intended.height, area.height) };
-  const to = snap(from, area);
+  const to = throwLanding || snap(from, area);
   const horizontal = to.x === area.x ? "left" : to.x + to.width === area.x + area.width ? "right" : "";
   const vertical = to.y === area.y ? "top" : to.y + to.height === area.y + area.height ? "bottom" : "";
   if (!horizontal && !vertical) { syncContact(null); return; }
@@ -548,6 +576,14 @@ async function completeLyricsLookup(playback, pending) {
   publishState({ playback: latest, lyrics, activeLyricIndex: activeLyricIndex(latest, lyrics) });
 }
 
+async function completeCoverLookup(song) {
+  const artworkUrl = await findCover(song);
+  if (!artworkUrl || state.playback?.uri !== song.uri || state.playback.artworkUrl) return;
+  const latest = estimatedPlayback();
+  lastPlaybackRefreshAt = Date.now();
+  publishState({ playback: { ...latest, artworkUrl }, activeLyricIndex: activeLyricIndex(latest, currentLyrics) });
+}
+
 async function refreshPlayback(options = {}) {
   const request = ++playbackRequest;
   try {
@@ -594,6 +630,9 @@ async function refreshPlayback(options = {}) {
     rateLimitUntil = 0;
     rateLimitKind = "";
     const trackKey = playback.empty ? "" : playback.uri;
+    if (trackKey && !playback.artworkUrl && state.playback?.uri === trackKey) {
+      playback.artworkUrl = state.playback.artworkUrl || "";
+    }
 
     if (options.waitForTrackChangeFrom && trackKey === options.waitForTrackChangeFrom) {
       return playback;
@@ -629,6 +668,7 @@ async function refreshPlayback(options = {}) {
       activeLyricIndex: activeLyricIndex(playback, currentLyrics)
     });
     if (needsLookup) void completeLyricsLookup(playback, currentLyrics);
+    if (local && trackKey && !playback.artworkUrl) void completeCoverLookup(playback);
     return playback;
   } catch (error) {
     if (request < latestAppliedRequest) return;
@@ -1002,7 +1042,9 @@ ipcMain.handle("island:drag", (event, phase, grip) => {
     const bounds = mainWindow.getBounds();
     if (!grip || !Number.isFinite(grip.x) || !Number.isFinite(grip.y)) return;
     cancelSnap();
-    dragSession = { grip: { x: clamp(Math.round(grip.x), 0, bounds.width),
+    const samples = [];
+    sample(samples, bounds, performance.now());
+    dragSession = { samples, displayId: screen.getDisplayMatching(bounds).id, grip: { x: clamp(Math.round(grip.x), 0, bounds.width),
       y: clamp(Math.round(grip.y), 0, bounds.height) }, start: point, moved: false };
     return;
   }
@@ -1013,14 +1055,20 @@ ipcMain.handle("island:drag", (event, phase, grip) => {
   drag.moved = true;
   syncContact(null);
   // The cursor chooses the destination so clamping never traps a drag at a monitor seam.
-  const area = screen.getDisplayNearestPoint(point).workArea;
+  const display = screen.getDisplayNearestPoint(point);
+  const area = display.workArea;
   const next = contain({ ...(windowExpanded ? expandedSize : compactSize),
     x: point.x - drag.grip.x, y: point.y - drag.grip.y }, area);
+  if (drag.displayId !== display.id) {
+    drag.samples.length = 0; // A monitor handoff can reposition the entire island in one frame.
+    drag.displayId = display.id;
+  }
+  sample(drag.samples, next, performance.now());
   if (!drag.last || ["x", "y", "width", "height"].some(k => next[k] !== drag.last[k])) {
     mainWindow.setBounds(next, false);
     drag.last = next;
   }
-  if (phase === "end" && config.snapEdges) dockAfterDrag(mainWindow);
+  if (phase === "end") finishPointerDrag(mainWindow, next, area, drag.samples);
 });
 
 ipcMain.handle("island:resize-expanded", (event, requestedSize) => {

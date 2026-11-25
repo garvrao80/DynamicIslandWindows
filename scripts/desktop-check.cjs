@@ -11,6 +11,9 @@ const transport = [];
 media.getWindowsPlayback = async () => ({uri:track, track, artist:"Fixture", isPlaying:true, progressMs:progress, durationMs:60000});
 media.requestWindowsMedia = async (action, ms) => { transport.push(action); if (action === "seek") progress = ms; };
 const online = {synced:[{timeMs:0,text:"Online"}], plain:"", source:"Fixture"};
+// No external catalog requests from this isolated player.
+const fixtureCover="data:image/svg+xml;base64,"+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"><rect width="8" height="8" fill="blue"/></svg>').toString("base64");
+require("../src/main/artwork").createCoverLookup=()=>async()=>fixtureCover;
 require("../src/main/lyrics").fetchLyrics = async () => finishOnline ? online :
   new Promise(resolve => { finishOnline = () => resolve(online); });
 dialog.showOpenDialog = () => choose();
@@ -20,7 +23,7 @@ globalShortcut.register = (key, fn) => {
 };
 globalShortcut.unregister = () => {};
 const wait = ms => new Promise(r => setTimeout(r, ms));
-setTimeout(() => { console.error("Timed out"); app.exit(2); }, 30000);
+setTimeout(() => { console.error("Timed out"); app.exit(2); }, 40000);
 app.once("browser-window-created", (_, win) => win.webContents.once("did-finish-load", async () => {
   const js = code => win.webContents.executeJavaScript(code).catch(e => {throw new Error(code + ": " + e.message);});
   const until = async code => {
@@ -29,6 +32,7 @@ app.once("browser-window-created", (_, win) => win.webContents.once("did-finish-
   };
   try {
     await until('currentState?.playback?.uri === "A"');
+    await until('art.style.backgroundImage.includes("data:image/") && expandedArt.style.backgroundImage === art.style.backgroundImage');
     await js('setExpanded(true)'); await wait(400);
     await js('settingsToggle.click(); shortcut.value="Ctrl+Alt+L"; snapEdges.checked=true; settings.requestSubmit()');
     await until('currentState.config.snapEdges && currentState.config.toggleShortcut === "Ctrl+Alt+L"');
@@ -137,6 +141,61 @@ app.once("browser-window-created", (_, win) => win.webContents.once("did-finish-
       const grip = await js('(()=>{const r=document.querySelector('+
         JSON.stringify(expanded?".lyric-line.active":"#play")+').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()');
       const actionsBeforeDrag = transport.length;
+      // Simulate cursor samples through the production drag IPC, independently of
+      // the user's mouse. Check actual window bounds after releasing and regrabbing.
+      const home = win.getBounds();
+      const base = {...home, x:area.x+100, y:area.y+100};
+      let flickCursor;
+      screen.getCursorScreenPoint = () => flickCursor;
+      const phase = name => js('window.lyricsIsland.drag('+JSON.stringify(name)+',{x:20,y:20})');
+      async function flick(stepX=32, stepY=0) {
+        win.setBounds(base);
+        flickCursor={x:base.x+20,y:base.y+20};
+        await phase("start");
+        for (let i=0;i<3;i++) {
+          await wait(16);
+          flickCursor={x:flickCursor.x+stepX,y:flickCursor.y+stepY};
+          await phase("move");
+        }
+        await phase("end");
+        return win.getBounds().x;
+      }
+      reduced=false;
+      const released=await flick();
+      await wait(240);
+      const landed=win.getBounds();
+      assert.ok(landed.x > released+8 && landed.x <= released+91,"fast release should coast briefly");
+      assert.ok(Math.abs(landed.y-base.y)<=1 && Math.abs(landed.width-base.width)<=1);
+      await flick(); await wait(30); await phase("start");
+      const caught=win.getBounds(); await wait(240);
+      assert.deepEqual(win.getBounds(),caught,"regrab cancels coast");
+      await phase("cancel");
+      {
+        await js('window.lastDock=null;window.lyricsIsland.saveConfig({snapEdges:true})');
+        const right = area.x+area.width-base.width;
+        const bottom = area.y+area.height-base.height;
+        const originalX = base.x, originalY = base.y;
+        // Beyond even a max 90-DIP coast plus the ordinary 36-DIP snap.
+        base.x = right-144-165;
+        if (expanded) base.y = bottom-144-170;
+        await flick(48,expanded?48:0);
+        await until(expanded ? 'window.lastDock?.horizontal==="right" && window.lastDock.vertical==="bottom"'
+          : 'window.lastDock?.horizontal==="right" && !window.lastDock.vertical');
+        assert.ok(Math.abs(win.getBounds().x-right)<=1,"glide settles at work-area edge");
+        if (expanded) assert.ok(Math.abs(win.getBounds().y-bottom)<=1,"diagonal throw attaches to both edges");
+        await js('window.lastDock=null');
+        await flick(48,expanded?48:0); await wait(30); await phase("start");
+        const heldThrow=win.getBounds(); await wait(470);
+        assert.deepEqual(win.getBounds(),heldThrow,"regrab interrupts long throw");
+        assert.ok(await js('!window.lastDock'));
+        await phase("cancel");
+        base.x = originalX; base.y = originalY;
+        await js('window.lyricsIsland.saveConfig({snapEdges:false})');
+      }
+      reduced=true;
+      const instant=await flick(); await wait(100);
+      assert.equal(win.getBounds().x,instant,"reduced motion never coasts");
+      win.setBounds(home);
       const start = win.getBounds();
       let cursor = {x:start.x+grip.x,y:start.y+grip.y};
       screen.getCursorScreenPoint = () => cursor;

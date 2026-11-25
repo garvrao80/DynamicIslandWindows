@@ -11,6 +11,7 @@ This is an open-source Electron app inspired by the macOS LyricsNotch concept an
 - Always-on-top floating pill with compact and expanded views
 - Spotify playback controls: play, pause, previous, next, and seek
 - Synced lyrics from [LRCLIB](https://lrclib.net/)
+- In the source build, if Spotify on this PC omits the cover, the island looks up the artist, track and album in Apple's iTunes catalog. A matching cover appears in both views; no Spotify token is sent to Apple.
 - Spotify OAuth 2.0 Authorization Code with PKCE
 - Demo mode for trying the interface without Spotify
 - Draggable compact and expanded layouts
@@ -23,7 +24,7 @@ This is an open-source Electron app inspired by the macOS LyricsNotch concept an
 
 - **Show/hide without switching apps:** in expanded Settings, choose a global shortcut and click Save. Off by default. If another app owns the combination, select a different one. The tray can always bring the island back.
 - **Bring your own synced lyrics:** while a track plays, open Settings → **Import .lrc for song** and choose a UTF-8 timestamped LRC. The island keeps a local copy for that track and playback source, including after restart. Scrolling, click-to-seek and timing corrections work as with online lyrics. Choose **Use automatic lyrics** to remove the copy and return to LRCLIB.
-- **Monitor placement:** enable **Snap to edges**, then release the island within 36 Windows display units of an edge or corner. Both views form curved shoulders where they meet the screen, scaled to fit the compact pill or expanded island. Artwork and controls stay inside the outline. Pull the island away to restore its floating shape. A mint light marks the landing; Windows reduced motion skips the animations. Use the tray’s **Move to monitor** menu to return to a display’s remembered spot.
+- **Monitor placement:** enable **Snap to edges**, then release the island within 36 Windows display units of an edge or corner. Both views form curved shoulders where they meet the screen, scaled to fit the compact pill or expanded island. Artwork and controls stay inside the outline. Pull the island away to restore its floating shape. A brief light marks the landing; Windows reduced motion skips the animations. Use the tray’s **Move to monitor** menu to return to a display’s remembered spot.
 
 To check a source build, run `npm test` for the lyrics and placement tests and `npm run test:desktop` for a Windows Electron smoke test. The desktop test uses sample tracks and a temporary profile; it does not seek or skip your music.
 
@@ -125,6 +126,8 @@ A fresh local profile prompts you to play a song in Spotify. Select **Spotify We
 
 - Double-click the compact pill to expand it.
 - Drag either view from the artwork, title, lyrics, or playback buttons. A click still activates a button or seeks to a timed lyric; dragging it moves the island instead. The progress bar, resize handle, and settings form keep their own gestures.
+- In the source build, releasing a fast drag gives either view a short glide. Drag slowly or pause before releasing for precise placement. Grab again to interrupt; Windows reduced motion disables the glide.
+- In the source build, enable **Snap to edges** and flick toward an edge to dock from up to 420 Windows display units away. Aim diagonally to attach to a corner. A white glow marks the landing. Ordinary drags keep their 36-unit snap distance.
 - In expanded mode, drag the bottom-right resize button to change the island size. The last expanded size is reused when you collapse and expand it again during the session.
 - In expanded mode, scroll over the lyrics to browse manually. When playback is active, the lyrics return to the current line after about two seconds without scrolling.
 - Click any synced lyric line in expanded mode to seek Spotify directly to that part of the song.

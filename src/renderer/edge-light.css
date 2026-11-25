@@ -3,8 +3,8 @@ i { display: none; position: absolute; inset: 0; opacity: 0; }
 i:target {
   display: block;
   background:
-    radial-gradient(ellipse var(--line) at var(--origin), #d6fff0aa, #87eacb99 57%, transparent),
-    radial-gradient(ellipse var(--wash) at var(--origin), #a0f6d94d, #69dcb31f 56%, transparent);
+    radial-gradient(ellipse var(--line) at var(--origin), #ffffffaa, #ffffff99 57%, transparent),
+    radial-gradient(ellipse var(--wash) at var(--origin), #ffffff4d, #ffffff1f 56%, transparent);
 }
 #top, #bottom { --line: 49% 1.6px; --wash: 50% 10px; }
 #left, #right { --line: 1.6px 49%; --wash: 10px 50%; }

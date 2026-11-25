@@ -97,7 +97,11 @@ async function updateArtwork(url) {
   if (!url) return;
   const image = new Image();
   image.src = url;
-  try { await image.decode(); } catch { return; }
+  try { await image.decode(); } catch {
+    // Allow the next playback sample to retry a transient image load failure.
+    if (version === artworkVersion) requestedArtwork = undefined;
+    return;
+  }
   if (version !== artworkVersion) return;
   const cover = `url("${url}")`;
   art.style.backgroundImage = expandedArt.style.backgroundImage = cover;

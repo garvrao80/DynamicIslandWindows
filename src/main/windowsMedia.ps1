@@ -15,7 +15,7 @@ function Wait-Result($operation, $type) {
 $manager = Wait-Result ($managerType::RequestAsync()) $managerType
 function Get-Cover($media) {
     $key = @($media.Title, $media.Artist, $media.AlbumTitle) -join [char]31
-    if ($key -eq $script:coverKey) { return $script:cover }
+    if ($key -eq $script:coverKey -and $script:cover) { return $script:cover }
     $script:coverKey = $key
     $script:cover = ''
     if (!$media.Thumbnail) { return '' }
@@ -24,7 +24,7 @@ function Get-Cover($media) {
         $stream = Wait-Result ($media.Thumbnail.OpenReadAsync()) $type
         $randomAccess = [Windows.Storage.Streams.IRandomAccessStream,Windows.Storage.Streams,ContentType=WindowsRuntime]
         $size = $randomAccess.GetProperty('Size').GetValue($stream)
-        if ($size -gt 0 -and $size -le 524288) {
+        if ($size -gt 0 -and $size -le 2097152) {
             $inputStream = $randomAccess.GetMethod('GetInputStreamAt').Invoke($stream, @([uint64]0))
             $method = [System.IO.WindowsRuntimeStreamExtensions].GetMethods() | Where-Object {
                 $_.Name -eq 'AsStreamForRead' -and $_.GetParameters().Count -eq 1

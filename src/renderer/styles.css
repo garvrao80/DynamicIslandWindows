@@ -105,14 +105,14 @@ input {
   border-radius: inherit;
   opacity: 0;
   background: radial-gradient(ellipse 96px 32px at var(--dock-x, 50%) var(--dock-y, 50%),
-    rgba(166, 252, 219, .12), transparent);
+    rgba(255, 255, 255, .12), transparent);
 }
 #dockGlow::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  border: 1px solid rgba(188, 255, 236, .52);
+  border: 1px solid rgba(255, 255, 255, .52);
   mask-image: radial-gradient(ellipse 140px 85px at var(--dock-x) var(--dock-y), black 10%, transparent);
 }
 
