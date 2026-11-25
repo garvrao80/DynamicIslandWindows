@@ -11,17 +11,22 @@ permissions:
 
 jobs:
   build:
+    timeout-minutes: 15
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm test
+      - run: npm audit --audit-level=high
       - name: Build installer and portable executable
-        run: npx electron-builder --win nsis portable --config.win.signAndEditExecutable=false --publish never
+        run: npx electron-builder --win nsis portable --config.win.signExecutable=false --publish never
+      - name: Install and launch the packaged app on the fresh Windows runner
+        shell: pwsh
+        run: ./.github/scripts/test-installer.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: Lyrics-Island-Windows

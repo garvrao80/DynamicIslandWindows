@@ -472,6 +472,9 @@ function recognizeDrag(event) {
   // Until committed the window is stationary, so client coordinates are stable.
   if (!dragging && Math.hypot(event.clientX - dragOrigin.x, event.clientY - dragOrigin.y) >= 5) {
     dragging = true;
+    // Rows and button contents can be replaced on a playback refresh. Once
+    // this is a drag, let the persistent island own capture until release.
+    if (event.type === "pointermove") island.setPointerCapture(event.pointerId);
     island.classList.add("is-dragging");
   }
 }
@@ -493,6 +496,7 @@ island.addEventListener("pointermove", event => {
 });
 function finishDrag(event) {
   if (event.pointerId !== dragPointer) return;
+  if (event.type === "lostpointercapture" && island.hasPointerCapture(event.pointerId)) return;
   if (event.type === "pointerup") recognizeDrag(event);
   suppressDragClick = dragging;
   island.classList.remove("is-dragging");

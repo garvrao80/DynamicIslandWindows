@@ -8,10 +8,10 @@ i:target {
 }
 #top, #bottom { --line: 49% 1.6px; --wash: 50% 10px; }
 #left, #right { --line: 1.6px 49%; --wash: 10px 50%; }
-#top { --origin: 50% 0%; }
-#bottom { --origin: 50% 100%; }
-#left { --origin: 0% 50%; }
-#right { --origin: 100% 50%; }
+#top { bottom: auto; height: 16px; --origin: 50% 0%; }
+#bottom { top: auto; height: 16px; --origin: 50% 100%; }
+#left { right: auto; width: 16px; --origin: 0% 50%; }
+#right { left: auto; width: 16px; --origin: 100% 50%; }
 body.lit i:target { animation: arrive 950ms both; }
 @keyframes arrive {
   0% { opacity: 0; }

@@ -10,7 +10,7 @@ Thanks for helping make floating lyrics on Windows easier to use. Code, document
 
 ## Local setup
 
-Use Windows 10/11 and Node.js 20 or newer. Fork and clone the repository, then run:
+Use Windows 10/11 and Node.js 24.12 or newer. Fork and clone the repository, then run:
 
 ```powershell
 npm ci

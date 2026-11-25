@@ -1,13 +1,12 @@
-# Lyrics Island v0.1.1-beta.3
+# Lyrics Island v0.1.1-beta.4
 
 Play a song in Spotify desktop on this PC and the island picks it up through Windows media sessions. Fresh installations use this source automatically. After upgrading, select **Settings → Spotify on this PC → Save** to switch an existing profile. For playback on another device, choose **Spotify Web API** to see the Client ID and connection controls.
 
 ## What's new
 
-- Optional magnetic docking in both views: release near a screen edge or corner for a curved attachment and a brief glow. Reduced motion is respected.
-- Docked layouts keep artwork, lyrics and playback controls inside the glass. The compact cover adapts to the available height at side attachments.
-- Drag from the artwork, text or playback buttons. Both views stay on screen, retain the expanded size, and remember placement per monitor.
-- Choose a global show/hide shortcut in Settings, or import a local synced LRC for the current song. Imported lyrics persist after restart and support lyric seeking and timing adjustments.
+- Flick the compact or expanded island to let it glide. With Snap to edges enabled, throw toward a screen edge or corner to dock with a brief white glow. Slow drags still allow precise placement; reduced motion disables the animation.
+- When Spotify's local session omits artwork, the island can match the track in Apple's iTunes catalog. No Spotify token is sent.
+- Updated to Electron 45.5.0 and refreshed the Windows packaging dependencies. No Node.js installation is required to use either download.
 
 ## Windows downloads
 

@@ -73,12 +73,16 @@ app.once("browser-window-created", (_, win) => win.webContents.once("did-finish-
     assert.equal(strips.length, 2, "one light per contacted screen edge");
     for (const strip of strips) {
       for (let n=0;n<30 && !strip.isVisible();n++) await wait(12);
-      assert.ok(!strip.isFocusable() && strip.isVisible());
+      assert.equal(strip.isFocusable(), false, "edge light must not take focus");
+      assert.equal(strip.isVisible(), true, "edge light must be visible after landing");
       const bounds = strip.getBounds();
       const display = screen.getDisplayMatching(win.getBounds()).bounds;
+      if (strip.webContents.isLoadingMainFrame()) await new Promise(resolve => strip.webContents.once("did-finish-load",resolve));
       const top = strip.webContents.getURL().endsWith("#top");
-      assert.ok(top ? bounds.height <= 17 && Math.abs(bounds.y-display.y)<=1 :
-        bounds.width <= 17 && Math.abs(bounds.x-display.x)<=1, JSON.stringify({url:strip.webContents.getURL(),bounds,display}));
+      const thickness = await strip.webContents.executeJavaScript("document.querySelector(':target').getBoundingClientRect()." + (top ? "height" : "width"));
+      assert.equal(thickness,16,"visible edge-light thickness");
+      assert.ok(top ? Math.abs(bounds.y-display.y)<=1 :
+        Math.abs(bounds.x-display.x)<=1, JSON.stringify({url:strip.webContents.getURL(),bounds,display}));
       assert.ok(top ? bounds.width > landed.width : bounds.height > landed.height);
       assert.ok(await strip.webContents.executeJavaScript("document.body.classList.contains('lit') && getComputedStyle(document.querySelector(':target')).backgroundImage.includes('radial-gradient')"));
     }
@@ -90,6 +94,7 @@ app.once("browser-window-created", (_, win) => win.webContents.once("did-finish-
     await until('window.lastDock?.horizontal === "right" && window.lastDock.vertical === "bottom"');
     assert.deepEqual(await js('[innerWidth, innerHeight]'),viewport);
     for (const strip of BrowserWindow.getAllWindows().filter(w => w !== win)) {
+      if (strip.webContents.isLoadingMainFrame()) await new Promise(resolve => strip.webContents.once("did-finish-load",resolve));
       const b = strip.getBounds(), d = screen.getDisplayMatching(win.getBounds()).bounds;
       const delta = strip.webContents.getURL().endsWith("#bottom") ? b.y+b.height-d.y-d.height : b.x+b.width-d.x-d.width;
       assert.ok(Math.abs(delta) <= 1, "light must reach physical screen border: " + JSON.stringify({b,d}));
@@ -195,28 +200,39 @@ app.once("browser-window-created", (_, win) => win.webContents.once("did-finish-
       reduced=true;
       const instant=await flick(); await wait(100);
       assert.equal(win.getBounds().x,instant,"reduced motion never coasts");
-      win.setBounds(home);
+      win.setBounds({...home,x:area.x+100,y:area.y+100});
       const start = win.getBounds();
       let cursor = {x:start.x+grip.x,y:start.y+grip.y};
       screen.getCursorScreenPoint = () => cursor;
       win.webContents.sendInputEvent({type:"mouseDown",button:"left",clickCount:1,...grip});
       await wait(100);
+      cursor={x:cursor.x+20,y:cursor.y};
+      win.webContents.sendInputEvent({type:"mouseMove",modifiers:["leftButtonDown"],x:grip.x+20,y:grip.y});
+      await until('dragging');
+      await wait(90);
+      assert.ok(Math.abs(win.getBounds().x-start.x-20)<=1,"native pointer gesture moves the window");
+      win.webContents.sendInputEvent({type:"mouseUp",button:"left",clickCount:1,...grip});
+      await wait(100);
+      assert.equal(transport.length,actionsBeforeDrag,"drag must not play/pause or seek");
+      // Windows may discard injected pointer capture when the real mouse is
+      // elsewhere. Exercise all long-distance moves with the same drag IPC.
+      await js('window.lyricsIsland.drag("start",'+JSON.stringify(grip)+')');
       const endX=area.x+area.width, endY=area.y+area.height;
       const midX=area.x+Math.floor(area.width/2), midY=area.y+Math.floor(area.height/2);
-      let step=0;
       for (const [x,y] of [[area.x,midY],[endX-1,midY],[midX,area.y],[midX,endY-1],
         [area.x,area.y],[endX-1,area.y],[area.x,endY-1],[endX-1,endY-1]]) {
         cursor = {x,y};
-        win.webContents.sendInputEvent({type:"mouseMove",modifiers:["leftButtonDown"],x:grip.x+8+(step++%2),y:grip.y});
-        await wait(90);
+        // Dragging uses the logical layout size, not a DPI-rounded HWND readback.
+        const size=expanded ? customSize : {width:308,height:63};
+        const wantedX=Math.max(area.x,Math.min(x-grip.x,endX-size.width));
+        const wantedY=Math.max(area.y,Math.min(y-grip.y,endY-size.height));
+        await js('window.lyricsIsland.drag("move")');
         const b=win.getBounds();
         assert.ok(b.x>=area.x && b.y>=area.y && b.x+b.width<=endX+1 && b.y+b.height<=endY+1, JSON.stringify(b));
-        const wantedX=Math.max(area.x,Math.min(x-grip.x,endX-start.width));
-        const wantedY=Math.max(area.y,Math.min(y-grip.y,endY-start.height));
         assert.ok(Math.abs(b.x-wantedX)<=1 && Math.abs(b.y-wantedY)<=1, JSON.stringify({b,wantedX,wantedY}));
       }
-      win.webContents.sendInputEvent({type:"mouseUp",button:"left",clickCount:1,...grip}); await wait(100);
-      assert.equal(transport.length,actionsBeforeDrag,"drag must not play/pause or seek");
+      await js('window.lyricsIsland.drag("end")');
+      await wait(100);
       win.webContents.sendInputEvent({type:"mouseDown",button:"left",clickCount:1,...grip});
       win.webContents.sendInputEvent({type:"mouseUp",button:"left",clickCount:1,...grip});
       await wait(130);
